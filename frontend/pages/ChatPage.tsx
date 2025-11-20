@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, getAccessToken, getUserFromToken } from '../services/api';
-import { Link, ChatMessage } from '../types';
+import { ChatMessage } from '../types';
 
 // --- Mock WebSocket for Preview ---
 class MockWebSocket {
@@ -68,15 +69,35 @@ class MockWebSocket {
 
 export default function ChatPage() {
     const { user } = useApp();
-    const [links, setLinks] = useState<Link[]>([]);
+    const location = useLocation();
+    const [chatPartners, setChatPartners] = useState<any[]>([]);
     const [selectedPartner, setSelectedPartner] = useState<number | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isConnected, setIsConnected] = useState(false);
     const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({});
+    const [complaintId, setComplaintId] = useState<number | null>(null);
     
     const wsRef = useRef<any>(null); 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Handle navigation state (from complaint "Reply in Chat" button)
+    useEffect(() => {
+        const state = location.state as any;
+        if (state?.selectedUserId) {
+            setSelectedPartner(state.selectedUserId);
+            if (state.complaintText) {
+                setInput(state.complaintText);
+            }
+            if (state.complaintId) {
+                setComplaintId(state.complaintId);
+                // Auto-assign complaint to current user (Sales Rep)
+                if (user?.role === 'SUPPLIER_SALES') {
+                    api.complaint.assignToMe(state.complaintId).catch(console.error);
+                }
+            }
+        }
+    }, [location.state, user]);
 
     // Global WebSocket connection
     useEffect(() => {
@@ -121,8 +142,11 @@ export default function ChatPage() {
     }, [user, selectedPartner]);
 
     useEffect(() => {
-        api.getMyLinks().then(l => {
-            setLinks(l.filter(link => link.status === 'APPROVED'));
+        // Load available chat partners (Sales Reps for Consumers, Consumers for Sales Reps)
+        api.auth.getChatPartners().then(partners => {
+            setChatPartners(partners);
+        }).catch(err => {
+            console.error('Failed to load chat partners:', err);
         });
         
         // Fetch unread counts initially and every 5 seconds
@@ -172,27 +196,31 @@ export default function ChatPage() {
                     <h2 className="font-bold text-2xl text-system-text tracking-tight">Messages</h2>
                 </div>
                 <div className="overflow-y-auto flex-grow p-3 space-y-1">
-                    {links.length === 0 ? (
-                        <div className="p-4 text-xs text-system-textSec text-center">No contacts available.</div>
+                    {chatPartners.length === 0 ? (
+                        <div className="p-4 text-xs text-system-textSec text-center">
+                            {user?.role === 'CONSUMER' ? 'No Sales Reps available. Connect with suppliers first.' : 'No Consumers available. Await approved connections.'}
+                        </div>
                     ) : (
-                        links.map(link => {
-                            const partnerId = user?.role === 'CONSUMER' ? link.supplier_id : link.consumer_id;
+                        chatPartners.map(partner => {
+                            const partnerId = partner.id;
                             const active = selectedPartner === partnerId;
                             const unreadCount = unreadCounts[partnerId] || 0;
                             return (
                                 <button
-                                    key={link.id}
+                                    key={partner.id}
                                     onClick={() => setSelectedPartner(partnerId)}
                                     className={`w-full text-left p-4 rounded-xl transition-colors flex items-center gap-3 relative ${active ? 'bg-system-blue text-white shadow-md' : 'hover:bg-white text-system-text'}`}
                                 >
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${active ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                                        {user?.role === 'CONSUMER' ? 'S' : 'C'}
+                                        {partner.email.charAt(0).toUpperCase()}
                                     </div>
                                     <div className="flex-grow">
                                         <div className={`font-semibold text-sm ${active ? 'text-white' : 'text-system-text'}`}>
-                                            {user?.role === 'CONSUMER' ? `Supplier #${partnerId}` : `Consumer #${partnerId}`}
+                                            {partner.email}
                                         </div>
-                                        <div className={`text-xs ${active ? 'text-white/80' : 'text-system-textSec'}`}>ID: {link.id}</div>
+                                        <div className={`text-xs ${active ? 'text-white/80' : 'text-system-textSec'}`}>
+                                            {partner.role === 'SUPPLIER_SALES' ? 'Sales Rep' : 'Consumer'}
+                                        </div>
                                     </div>
                                     {unreadCount > 0 && (
                                         <div className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
@@ -220,7 +248,7 @@ export default function ChatPage() {
                         <div className="px-6 py-4 border-b border-system-border flex justify-between items-center bg-white/80 backdrop-blur sticky top-0 z-10">
                             <div>
                                 <div className="font-semibold text-system-text">
-                                    {user?.role === 'CONSUMER' ? `Supplier #${selectedPartner}` : `Consumer #${selectedPartner}`}
+                                    {chatPartners.find(p => p.id === selectedPartner)?.email || `User #${selectedPartner}`}
                                 </div>
                                 <div className={`text-xs ${isConnected ? 'text-system-green' : 'text-system-textSec'}`}>
                                     {isConnected ? 'Active Now' : 'Connecting...'}

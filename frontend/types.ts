@@ -94,6 +94,8 @@ export interface ChatMessage {
 export interface Complaint {
   id: number;
   order_id: number;
+  created_by: number | null;  // User ID who created the complaint
+  consumer_id: number;  // Company ID
   handler_id?: number;
   status: ComplaintStatus;
   description: string;

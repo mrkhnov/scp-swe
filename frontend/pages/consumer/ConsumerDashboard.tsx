@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { api } from '../../services/api';
-import { Link, LinkStatus, Product, Order } from '../../types';
+import { Link, LinkStatus, Product, Order, Complaint, ComplaintStatus } from '../../types';
 import { useApp } from '../../App';
 
 export default function ConsumerDashboard() {
@@ -10,6 +10,7 @@ export default function ConsumerDashboard() {
             <Route path="/" element={<ConsumerCatalog />} />
             <Route path="/suppliers" element={<ConsumerLinks />} />
             <Route path="/orders" element={<ConsumerOrders />} />
+            <Route path="/complaints" element={<ConsumerComplaints />} />
         </Routes>
     );
 }
@@ -243,47 +244,184 @@ function ConsumerCatalog() {
 
 function ConsumerOrders() {
     const [myOrders, setMyOrders] = useState<Order[]>([]);
+    const [showComplaintForm, setShowComplaintForm] = useState<number | null>(null);
+    const [complaintText, setComplaintText] = useState('');
 
     useEffect(() => {
         api.getMyOrders().then(setMyOrders).catch(console.error);
     }, []);
 
+    const handleCreateComplaint = async (orderId: number) => {
+        if (!complaintText.trim()) {
+            alert('Please enter a description');
+            return;
+        }
+
+        try {
+            await api.createComplaint({ order_id: orderId, description: complaintText });
+            alert('Complaint created successfully');
+            setShowComplaintForm(null);
+            setComplaintText('');
+        } catch (err: any) {
+            alert(err.message);
+        }
+    };
+
     return (
-        <div className="bg-white rounded-3xl shadow-card border border-system-border/50 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-            <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-system-bg border-b border-system-border">
-                    <tr>
-                        <th className="p-5 text-xs font-semibold text-system-textSec uppercase tracking-wider">Order ID</th>
-                        <th className="p-5 text-xs font-semibold text-system-textSec uppercase tracking-wider">Supplier</th>
-                        <th className="p-5 text-xs font-semibold text-system-textSec uppercase tracking-wider">Amount</th>
-                        <th className="p-5 text-xs font-semibold text-system-textSec uppercase tracking-wider">Status</th>
-                        <th className="p-5 text-xs font-semibold text-system-textSec uppercase tracking-wider">Items</th>
-                    </tr>
-                    </thead>
-                    <tbody className="divide-y divide-system-border/50">
-                    {myOrders.map(order => (
-                        <tr key={order.id} className="hover:bg-system-bg/50 transition-colors">
-                        <td className="p-5 font-medium text-system-text">#{order.id}</td>
-                        <td className="p-5 text-system-text">Supplier #{order.supplier_id}</td>
-                        <td className="p-5 font-semibold text-system-text">${order.total_amount.toFixed(2)}</td>
-                        <td className="p-5">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                order.status === 'COMPLETED' ? 'bg-system-green/10 text-system-green' :
-                                order.status === 'PENDING' ? 'bg-system-blue/10 text-system-blue' :
-                                order.status === 'ACCEPTED' ? 'bg-purple-100 text-purple-600' :
-                                'bg-gray-100 text-gray-600'
-                            }`}>
-                            {order.status}
-                            </span>
-                        </td>
-                        <td className="p-5 text-system-textSec">{order.items.length} items</td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </table>
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <h2 className="text-2xl font-bold text-system-text tracking-tight">My Orders</h2>
+            
+            <div className="space-y-4">
+                {myOrders.map(order => (
+                    <div key={order.id} className="bg-white p-6 rounded-3xl shadow-card border border-system-border/50">
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="font-bold text-lg text-system-text">Order #{order.id}</span>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                        order.status === 'COMPLETED' ? 'bg-system-green/10 text-system-green' :
+                                        order.status === 'PENDING' ? 'bg-system-blue/10 text-system-blue' :
+                                        order.status === 'ACCEPTED' ? 'bg-purple-100 text-purple-600' :
+                                        order.status === 'IN_DELIVERY' ? 'bg-blue-100 text-blue-600' :
+                                        'bg-gray-100 text-gray-600'
+                                    }`}>
+                                        {order.status}
+                                    </span>
+                                </div>
+                                <p className="text-sm text-system-textSec">Supplier #{order.supplier_id} • {order.items.length} items</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="font-bold text-xl text-system-text">${order.total_amount.toFixed(2)}</p>
+                                {order.status !== 'CANCELLED' && order.status !== 'REJECTED' && (
+                                    <button
+                                        onClick={() => setShowComplaintForm(order.id)}
+                                        className="mt-2 text-sm text-system-red hover:underline"
+                                    >
+                                        Report Issue
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Order Items */}
+                        <div className="space-y-2">
+                            {order.items.map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-sm bg-system-bg p-3 rounded-lg">
+                                    <span>Product #{item.product_id} × {item.quantity}</span>
+                                    <span className="font-medium">${(item.unit_price_at_time * item.quantity).toFixed(2)}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Complaint Form */}
+                        {showComplaintForm === order.id && (
+                            <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-200">
+                                <h4 className="font-semibold text-system-text mb-3">Report an Issue</h4>
+                                <textarea
+                                    className="w-full p-3 bg-white border border-red-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-300"
+                                    rows={3}
+                                    placeholder="Describe the issue with this order..."
+                                    value={complaintText}
+                                    onChange={e => setComplaintText(e.target.value)}
+                                />
+                                <div className="flex gap-2 mt-3">
+                                    <button
+                                        onClick={() => handleCreateComplaint(order.id)}
+                                        className="bg-system-red text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700"
+                                    >
+                                        Submit Complaint
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowComplaintForm(null);
+                                            setComplaintText('');
+                                        }}
+                                        className="bg-white border border-system-border text-system-textSec px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
-            {myOrders.length === 0 && <div className="p-12 text-center text-system-textSec">No active orders.</div>}
+            {myOrders.length === 0 && <div className="bg-white p-12 rounded-3xl text-center text-system-textSec shadow-card border border-system-border/50">No orders yet.</div>}
+        </div>
+    );
+}
+
+function ConsumerComplaints() {
+    const [complaints, setComplaints] = useState<any[]>([]);
+
+    useEffect(() => {
+        loadComplaints();
+    }, []);
+
+    const loadComplaints = () => {
+        api.getMyComplaints().then(setComplaints).catch(console.error);
+    };
+
+    const handleEscalateToManager = async (complaintId: number) => {
+        if (!confirm('Not satisfied with the resolution? This will escalate the complaint to a Manager for review.')) {
+            return;
+        }
+        
+        try {
+            await api.complaint.escalate(complaintId);
+            alert('Complaint escalated to Manager');
+            loadComplaints();
+        } catch (err: any) {
+            alert(err.message || 'Failed to escalate complaint');
+        }
+    };
+
+    return (
+        <div className="space-y-8 animate-in fade-in">
+            <div>
+                <h2 className="text-2xl font-bold text-system-text tracking-tight">My Complaints</h2>
+                <p className="text-system-textSec">Track your reported issues</p>
+            </div>
+
+            <div className="space-y-4">
+                {complaints.map(complaint => (
+                    <div key={complaint.id} className="bg-white p-6 rounded-3xl shadow-card border border-system-border/50">
+                        <div className="flex justify-between items-start mb-3">
+                            <div>
+                                <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                <p className="text-xs text-system-textSec mt-1">Order #{complaint.order_id}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                    complaint.status === 'OPEN' ? 'bg-yellow-100 text-yellow-700' :
+                                    complaint.status === 'ESCALATED' ? 'bg-red-100 text-red-700' :
+                                    'bg-green-100 text-green-700'
+                                }`}>
+                                    {complaint.status}
+                                </span>
+                                {complaint.status === 'RESOLVED' && (
+                                    <button
+                                        onClick={() => handleEscalateToManager(complaint.id)}
+                                        className="text-xs bg-system-red text-white px-3 py-1 rounded-full hover:bg-red-700"
+                                    >
+                                        Not Satisfied
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <p className="text-sm text-system-text">{complaint.description}</p>
+                        {complaint.handler_id && (
+                            <p className="text-xs text-system-textSec mt-3">Assigned to Sales Rep #{complaint.handler_id}</p>
+                        )}
+                    </div>
+                ))}
+                {complaints.length === 0 && (
+                    <div className="bg-white p-12 rounded-3xl text-center text-system-textSec shadow-card border border-system-border/50">
+                        <span className="text-4xl mb-4 block">✅</span>
+                        <p>No complaints. Everything looks good!</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

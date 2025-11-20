@@ -178,6 +178,11 @@ export const auth = {
       method: 'DELETE',
     });
   },
+
+  // Get available chat partners (Sales Reps for Consumers, Consumers for Sales Reps)
+  async getChatPartners(): Promise<User[]> {
+    return apiRequest<User[]>('/auth/sales-reps');
+  },
 };
 
 // Links API
@@ -273,6 +278,25 @@ export const complaints = {
     });
   },
 
+  async assignToMe(complaintId: number): Promise<Complaint> {
+    return apiRequest<Complaint>(`/complaints/${complaintId}/assign`, {
+      method: 'PUT',
+    });
+  },
+
+  async resolve(complaintId: number): Promise<Complaint> {
+    return apiRequest<Complaint>(`/complaints/${complaintId}/resolve`, {
+      method: 'PUT',
+    });
+  },
+
+  async escalate(complaintId: number): Promise<Complaint> {
+    return apiRequest<Complaint>(`/complaints/${complaintId}/escalate`, {
+      method: 'PUT',
+      body: JSON.stringify({}),
+    });
+  },
+
   async updateComplaintStatus(complaintId: number, status: string): Promise<Complaint> {
     return apiRequest<Complaint>(`/complaints/${complaintId}/status`, {
       method: 'PUT',
@@ -331,6 +355,7 @@ export const api = {
   getMyComplaints: complaints.getMyComplaints,
   createComplaint: complaints.createComplaint,
   updateComplaintStatus: complaints.updateComplaintStatus,
+  complaint: complaints, // Export the full complaints object for new methods
   
   // Chat
   getChatHistory: chat.getChatHistory,

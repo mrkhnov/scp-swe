@@ -108,3 +108,65 @@ async def remove_company_user(
     await db.delete(user_to_remove)
     await db.commit()
     return {"message": "User removed successfully"}
+
+
+@router.get("/sales-reps", response_model=list[UserResponse])
+async def get_available_sales_reps(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get list of sales reps from linked suppliers (for Consumers) or own company (for Suppliers).
+    """
+    if current_user.role == UserRole.CONSUMER:
+        # Get sales reps from approved suppliers
+        from app.models.link import Link, LinkStatus as LS
+        from app.models.company import Company
+        
+        # Get approved supplier companies
+        result = await db.execute(
+            select(Link).where(
+                Link.consumer_id == current_user.company_id,
+                Link.status == LS.APPROVED
+            )
+        )
+        links = result.scalars().all()
+        supplier_ids = [link.supplier_id for link in links]
+        
+        if not supplier_ids:
+            return []
+        
+        # Get sales reps from those suppliers
+        result = await db.execute(
+            select(User).where(
+                User.company_id.in_(supplier_ids),
+                User.role == UserRole.SUPPLIER_SALES,
+                User.is_active == True
+            )
+        )
+        return result.scalars().all()
+    else:
+        # For suppliers, get consumers from approved links
+        from app.models.link import Link, LinkStatus as LS
+        
+        result = await db.execute(
+            select(Link).where(
+                Link.supplier_id == current_user.company_id,
+                Link.status == LS.APPROVED
+            )
+        )
+        links = result.scalars().all()
+        consumer_ids = [link.consumer_id for link in links]
+        
+        if not consumer_ids:
+            return []
+        
+        # Get consumer users
+        result = await db.execute(
+            select(User).where(
+                User.company_id.in_(consumer_ids),
+                User.role == UserRole.CONSUMER,
+                User.is_active == True
+            )
+        )
+        return result.scalars().all()

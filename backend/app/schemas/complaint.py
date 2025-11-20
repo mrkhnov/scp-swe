@@ -13,6 +13,8 @@ class ComplaintEscalate(BaseModel):
 class ComplaintResponse(BaseModel):
     id: int
     order_id: int
+    created_by: int | None  # User ID who created the complaint
+    consumer_id: int  # Company ID of the consumer
     handler_id: int | None
     status: ComplaintStatus
     description: str

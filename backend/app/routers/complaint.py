@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -21,7 +21,17 @@ async def create_complaint(
     Both Consumer and Supplier can create complaints.
     """
     complaint = await ComplaintService.create_complaint(db, current_user, complaint_data)
-    return complaint
+    # Reload with order relationship
+    await db.refresh(complaint, ["order"])
+    return ComplaintResponse(
+        id=complaint.id,
+        order_id=complaint.order_id,
+        created_by=complaint.created_by,
+        consumer_id=complaint.order.consumer_id,
+        handler_id=complaint.handler_id,
+        status=complaint.status,
+        description=complaint.description
+    )
 
 
 @router.put("/{complaint_id}/assign", response_model=ComplaintResponse)
@@ -34,23 +44,42 @@ async def assign_complaint(
     Sales Rep assigns themselves to handle a complaint.
     """
     complaint = await ComplaintService.assign_complaint(db, complaint_id, current_user)
-    return complaint
+    await db.refresh(complaint, ["order"])
+    return ComplaintResponse(
+        id=complaint.id,
+        order_id=complaint.order_id,
+        created_by=complaint.created_by,
+        consumer_id=complaint.order.consumer_id,
+        handler_id=complaint.handler_id,
+        status=complaint.status,
+        description=complaint.description
+    )
 
 
 @router.put("/{complaint_id}/escalate", response_model=ComplaintResponse)
 async def escalate_complaint(
     complaint_id: int,
-    escalate_data: ComplaintEscalate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles([UserRole.SUPPLIER_SALES, UserRole.SUPPLIER_MANAGER]))
+    current_user: User = Depends(get_current_active_user),
+    escalate_data: ComplaintEscalate = Body(default=ComplaintEscalate())
 ):
     """
     Escalate a complaint to Manager level.
     Sales Rep escalates if they cannot resolve.
     Manager can also escalate or reassign.
+    Consumer can escalate RESOLVED complaints if not satisfied.
     """
     complaint = await ComplaintService.escalate_complaint(db, complaint_id, current_user, escalate_data)
-    return complaint
+    await db.refresh(complaint, ["order"])
+    return ComplaintResponse(
+        id=complaint.id,
+        order_id=complaint.order_id,
+        created_by=complaint.created_by,
+        consumer_id=complaint.order.consumer_id,
+        handler_id=complaint.handler_id,
+        status=complaint.status,
+        description=complaint.description
+    )
 
 
 @router.put("/{complaint_id}/resolve", response_model=ComplaintResponse)
@@ -65,7 +94,16 @@ async def resolve_complaint(
     Manager can resolve any complaint.
     """
     complaint = await ComplaintService.resolve_complaint(db, complaint_id, current_user)
-    return complaint
+    await db.refresh(complaint, ["order"])
+    return ComplaintResponse(
+        id=complaint.id,
+        order_id=complaint.order_id,
+        created_by=complaint.created_by,
+        consumer_id=complaint.order.consumer_id,
+        handler_id=complaint.handler_id,
+        status=complaint.status,
+        description=complaint.description
+    )
 
 
 @router.get("/", response_model=list[ComplaintResponse])
@@ -77,4 +115,15 @@ async def get_complaints(
     Get all complaints relevant to the current user's company.
     """
     complaints = await ComplaintService.get_complaints(db, current_user)
-    return complaints
+    return [
+        ComplaintResponse(
+            id=c.id,
+            order_id=c.order_id,
+            created_by=c.created_by,
+            consumer_id=c.order.consumer_id,
+            handler_id=c.handler_id,
+            status=c.status,
+            description=c.description
+        )
+        for c in complaints
+    ]

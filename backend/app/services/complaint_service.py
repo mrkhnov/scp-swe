@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
 from app.models.complaint import Complaint, ComplaintStatus
@@ -25,6 +26,7 @@ class ComplaintService:
             order_id=complaint_data.order_id,
             description=complaint_data.description,
             status=ComplaintStatus.OPEN,
+            created_by=user.id,
             handler_id=None
         )
         db.add(new_complaint)
@@ -60,6 +62,7 @@ class ComplaintService:
         """
         Escalate complaint to Manager.
         Sales Rep can escalate if they cannot resolve.
+        Consumer can escalate RESOLVED complaints if not satisfied.
         """
         complaint = await db.get(Complaint, complaint_id)
         if not complaint:
@@ -67,19 +70,27 @@ class ComplaintService:
 
         # Verify permissions
         order = await db.get(Order, complaint.order_id)
-        if user.role == UserRole.SUPPLIER_SALES:
+        
+        if user.role == UserRole.CONSUMER:
+            # Consumer can only escalate RESOLVED complaints
+            if order.consumer_id != user.company_id:
+                raise HTTPException(status_code=403, detail="Not your complaint")
+            if complaint.status != ComplaintStatus.RESOLVED:
+                raise HTTPException(status_code=400, detail="You can only escalate resolved complaints if not satisfied")
+        elif user.role == UserRole.SUPPLIER_SALES:
             if order.supplier_id != user.company_id:
                 raise HTTPException(status_code=403, detail="Not your company's complaint")
             if complaint.handler_id != user.id:
                 raise HTTPException(status_code=403, detail="You can only escalate complaints you are handling")
+            if complaint.status == ComplaintStatus.RESOLVED:
+                raise HTTPException(status_code=400, detail="Complaint is already resolved")
         elif user.role in [UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]:
             if order.supplier_id != user.company_id:
                 raise HTTPException(status_code=403, detail="Not your company's complaint")
+            if complaint.status == ComplaintStatus.RESOLVED:
+                raise HTTPException(status_code=400, detail="Complaint is already resolved")
         else:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
-
-        if complaint.status == ComplaintStatus.RESOLVED:
-            raise HTTPException(status_code=400, detail="Complaint is already resolved")
 
         complaint.status = ComplaintStatus.ESCALATED
         if escalate_data.handler_id:
@@ -123,12 +134,18 @@ class ComplaintService:
         if user.role == UserRole.CONSUMER:
             # Get complaints for orders from consumer's company
             result = await db.execute(
-                select(Complaint).join(Order).where(Order.consumer_id == user.company_id)
+                select(Complaint)
+                .join(Order)
+                .where(Order.consumer_id == user.company_id)
+                .options(selectinload(Complaint.order))
             )
         elif user.role in [UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER, UserRole.SUPPLIER_SALES]:
             # Get complaints for orders from supplier's company
             result = await db.execute(
-                select(Complaint).join(Order).where(Order.supplier_id == user.company_id)
+                select(Complaint)
+                .join(Order)
+                .where(Order.supplier_id == user.company_id)
+                .options(selectinload(Complaint.order))
             )
         else:
             return []

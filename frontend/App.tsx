@@ -5,6 +5,7 @@ import { api, getUserFromToken, logout } from './services/api';
 import Login from './pages/Login';
 import ConsumerDashboard from './pages/consumer/ConsumerDashboard';
 import SupplierDashboard from './pages/supplier/SupplierDashboard';
+import SalesRepDashboard from './pages/supplier/SalesRepDashboard';
 import ChatPage from './pages/ChatPage';
 
 // --- Global State Context ---
@@ -59,7 +60,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <>
                     <button 
                       onClick={() => navigate('/consumer')} 
-                      className={`transition-colors hover:text-system-text ${isActive('/consumer') ? 'text-system-text' : ''}`}
+                      className={`transition-colors hover:text-system-text ${isActive('/consumer') && !isActive('/consumer/suppliers') && !isActive('/consumer/orders') && !isActive('/consumer/complaints') ? 'text-system-text' : ''}`}
                     >
                       Marketplace
                     </button>
@@ -74,6 +75,33 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       className={`transition-colors hover:text-system-text ${isActive('/consumer/orders') ? 'text-system-text' : ''}`}
                     >
                       Orders
+                    </button>
+                    <button 
+                      onClick={() => navigate('/consumer/complaints')} 
+                      className={`transition-colors hover:text-system-text ${isActive('/consumer/complaints') ? 'text-system-text' : ''}`}
+                    >
+                      Complaints
+                    </button>
+                  </>
+                ) : user.role === UserRole.SUPPLIER_SALES ? (
+                  <>
+                    <button 
+                      onClick={() => navigate('/sales')} 
+                      className={`transition-colors hover:text-system-text ${isActive('/sales') ? 'text-system-text' : ''}`}
+                    >
+                      Overview
+                    </button>
+                    <button 
+                      onClick={() => navigate('/sales/orders')} 
+                      className={`transition-colors hover:text-system-text ${isActive('/sales/orders') ? 'text-system-text' : ''}`}
+                    >
+                      Orders
+                    </button>
+                    <button 
+                      onClick={() => navigate('/sales/complaints')} 
+                      className={`transition-colors hover:text-system-text ${isActive('/sales/complaints') ? 'text-system-text' : ''}`}
+                    >
+                      Complaints
                     </button>
                   </>
                 ) : (
@@ -96,6 +124,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     >
                       Orders
                     </button>
+                    <button 
+                      onClick={() => navigate('/supplier/complaints')} 
+                      className={`transition-colors hover:text-system-text ${isActive('/supplier/complaints') ? 'text-system-text' : ''}`}
+                    >
+                      Complaints
+                    </button>
                     {user.role === UserRole.SUPPLIER_OWNER && (
                       <button 
                         onClick={() => navigate('/supplier/team')} 
@@ -106,12 +140,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     )}
                   </>
                 )}
-                <button 
-                  onClick={() => navigate('/chat')} 
-                  className={`transition-colors hover:text-system-text ${isChat ? 'text-system-blue font-semibold' : ''}`}
-                >
-                  Messages
-                </button>
+                {/* Only show Messages for Consumer and Sales Rep */}
+                {(user.role === UserRole.CONSUMER || user.role === UserRole.SUPPLIER_SALES) && (
+                  <button 
+                    onClick={() => navigate('/chat')} 
+                    className={`transition-colors hover:text-system-text ${isChat ? 'text-system-blue font-semibold' : ''}`}
+                  >
+                    Messages
+                  </button>
+                )}
               </nav>
               
               <div className="flex items-center space-x-4 pl-4 border-l border-system-border">
@@ -212,7 +249,11 @@ export default function App() {
           {/* Root Redirect */}
           <Route path="/" element={
             user ? (
-              <Navigate to={user.role === UserRole.CONSUMER ? "/consumer" : "/supplier"} replace />
+              <Navigate to={
+                user.role === UserRole.CONSUMER ? "/consumer" : 
+                user.role === UserRole.SUPPLIER_SALES ? "/sales" :
+                "/supplier"
+              } replace />
             ) : (
               <Navigate to="/login" replace />
             )
@@ -225,10 +266,17 @@ export default function App() {
             </ProtectedRoute>
           } />
 
-          {/* Supplier Routes */}
+          {/* Supplier Routes (Owner & Manager) */}
           <Route path="/supplier/*" element={
-            <ProtectedRoute allowedRoles={[UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER, UserRole.SUPPLIER_SALES]}>
+            <ProtectedRoute allowedRoles={[UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]}>
               <SupplierDashboard />
+            </ProtectedRoute>
+          } />
+
+          {/* Sales Rep Routes */}
+          <Route path="/sales/*" element={
+            <ProtectedRoute allowedRoles={[UserRole.SUPPLIER_SALES]}>
+              <SalesRepDashboard />
             </ProtectedRoute>
           } />
 

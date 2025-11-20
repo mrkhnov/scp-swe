@@ -13,9 +13,11 @@ class Complaint(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     handler_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[ComplaintStatus] = mapped_column(Enum(ComplaintStatus), nullable=False, default=ComplaintStatus.OPEN)
     description: Mapped[str] = mapped_column(String(1000), nullable=False)
 
     order: Mapped["Order"] = relationship()
-    handler: Mapped["User"] = relationship()
+    creator: Mapped["User"] = relationship(foreign_keys=[created_by])
+    handler: Mapped["User"] = relationship(foreign_keys=[handler_id])

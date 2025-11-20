@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { api } from '../../services/api';
-import { Link, LinkStatus, Order, OrderStatus, Product, UserRole } from '../../types';
+import { Link, LinkStatus, Order, OrderStatus, Product, UserRole, Complaint, ComplaintStatus } from '../../types';
 import { useApp } from '../../App';
 
 export default function SupplierDashboard() {
@@ -10,6 +10,7 @@ export default function SupplierDashboard() {
             <Route path="/" element={<Overview />} />
             <Route path="/products" element={<Inventory />} />
             <Route path="/orders" element={<OrderManagement />} />
+            <Route path="/complaints" element={<ComplaintsManagement />} />
             <Route path="/team" element={<TeamManagement />} />
         </Routes>
     );
@@ -556,6 +557,128 @@ function TeamManagement() {
                     <div className="p-12 text-center text-system-textSec">
                         <span className="text-4xl mb-4 block">👥</span>
                         <p>No team members yet. Add some to get started!</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function ComplaintsManagement() {
+    const { user } = useApp();
+    const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadComplaints();
+    }, []);
+
+    const loadComplaints = async () => {
+        try {
+            const data = await api.getMyComplaints();
+            setComplaints(data);
+        } catch (error) {
+            console.error('Failed to load complaints:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResolve = async (complaintId: number) => {
+        if (!confirm('Are you sure you want to mark this complaint as resolved?')) return;
+        
+        try {
+            await api.complaint.resolve(complaintId);
+            await loadComplaints();
+        } catch (err: any) {
+            alert(err.message || 'Failed to resolve complaint');
+        }
+    };
+
+    const escalatedComplaints = complaints.filter(c => c.status === ComplaintStatus.ESCALATED);
+    const allComplaints = complaints.filter(c => c.status !== ComplaintStatus.ESCALATED);
+
+    if (loading) return <div>Loading complaints...</div>;
+
+    return (
+        <div className="space-y-8 animate-in fade-in">
+            <div>
+                <h2 className="text-2xl font-bold text-system-text tracking-tight">Complaint Management</h2>
+                <p className="text-system-textSec">
+                    {user?.role === UserRole.SUPPLIER_MANAGER 
+                        ? "Review and resolve escalated customer complaints"
+                        : "Overview of all customer complaints"}
+                </p>
+            </div>
+
+            {/* Escalated Complaints (Manager Priority) */}
+            {escalatedComplaints.length > 0 && (
+                <div className="bg-white p-8 rounded-3xl shadow-card border border-red-200/50">
+                    <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-system-red rounded-full animate-pulse"></span>
+                        Escalated Complaints (Requires Manager Action)
+                    </h3>
+                    <div className="space-y-4">
+                        {escalatedComplaints.map(complaint => (
+                            <div key={complaint.id} className="p-5 bg-red-50 rounded-2xl border border-red-200">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <p className="text-xs text-system-textSec mt-1">
+                                            Order #{complaint.order_id}
+                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                        </p>
+                                        <span className="inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                                            ESCALATED
+                                        </span>
+                                    </div>
+                                    {user?.role === UserRole.SUPPLIER_MANAGER && (
+                                        <button
+                                            onClick={() => handleResolve(complaint.id)}
+                                            className="bg-system-green text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600"
+                                        >
+                                            Resolve
+                                        </button>
+                                    )}
+                                </div>
+                                <p className="text-sm text-system-text">{complaint.description}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* All Other Complaints */}
+            <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
+                <h3 className="text-lg font-semibold text-system-text mb-6">All Complaints</h3>
+                {allComplaints.length === 0 ? (
+                    <p className="text-system-textSec text-sm">No complaints to display</p>
+                ) : (
+                    <div className="space-y-4">
+                        {allComplaints.map(complaint => (
+                            <div key={complaint.id} className="p-5 bg-system-bg rounded-2xl border border-system-border/50">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <p className="text-xs text-system-textSec mt-1">
+                                            Order #{complaint.order_id}
+                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                        </p>
+                                        <span className={`inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium ${
+                                            complaint.status === ComplaintStatus.OPEN ? 'bg-yellow-100 text-yellow-700' :
+                                            complaint.status === ComplaintStatus.RESOLVED ? 'bg-green-100 text-green-700' :
+                                            'bg-gray-100 text-gray-600'
+                                        }`}>
+                                            {complaint.status}
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-system-text">{complaint.description}</p>
+                                {complaint.handler_id && (
+                                    <p className="text-xs text-system-textSec mt-3">Handled by: Sales Rep #{complaint.handler_id}</p>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>
