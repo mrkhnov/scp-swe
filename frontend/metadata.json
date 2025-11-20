@@ -1,0 +1,5 @@
+{
+  "name": "SCP - Supplier Consumer Platform",
+  "description": "A B2B platform for connecting food suppliers with institutional consumers. Features include link-based catalogs, order management, and real-time chat.",
+  "requestFramePermissions": []
+}

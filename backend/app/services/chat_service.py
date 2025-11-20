@@ -1,0 +1,108 @@
+from typing import Dict
+from fastapi import WebSocket, WebSocketDisconnect
+from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
+
+from app.models.chat_message import ChatMessage
+from app.models.user import User
+
+
+class ConnectionManager:
+    """Manages WebSocket connections for real-time chat"""
+    
+    def __init__(self):
+        # Maps user_id to WebSocket connection
+        self.active_connections: Dict[int, WebSocket] = {}
+
+    async def connect(self, user_id: int, websocket: WebSocket):
+        """Accept and store a new WebSocket connection"""
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+
+    def disconnect(self, user_id: int):
+        """Remove a WebSocket connection"""
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+
+    async def send_personal_message(self, message: dict, user_id: int):
+        """Send a message to a specific user if they're connected"""
+        if user_id in self.active_connections:
+            websocket = self.active_connections[user_id]
+            await websocket.send_json(message)
+
+    async def broadcast(self, message: dict, exclude_user_id: int = None):
+        """Broadcast a message to all connected users"""
+        for user_id, connection in self.active_connections.items():
+            if exclude_user_id and user_id == exclude_user_id:
+                continue
+            await connection.send_json(message)
+
+
+# Global connection manager instance
+manager = ConnectionManager()
+
+
+class ChatService:
+    """Service for handling chat operations"""
+    
+    @staticmethod
+    async def save_message(db: AsyncSession, sender_id: int, recipient_id: int, content: str, attachment_url: str = None) -> ChatMessage:
+        """Save a chat message to the database"""
+        message = ChatMessage(
+            sender_id=sender_id,
+            recipient_id=recipient_id,
+            content=content,
+            attachment_url=attachment_url,
+            timestamp=datetime.utcnow()
+        )
+        db.add(message)
+        await db.commit()
+        await db.refresh(message)
+        return message
+
+    @staticmethod
+    async def get_chat_history(db: AsyncSession, user1_id: int, user2_id: int, limit: int = 50) -> list[ChatMessage]:
+        """Get chat history between two users"""
+        from sqlalchemy import select, or_, and_
+        
+        query = select(ChatMessage).where(
+            or_(
+                and_(ChatMessage.sender_id == user1_id, ChatMessage.recipient_id == user2_id),
+                and_(ChatMessage.sender_id == user2_id, ChatMessage.recipient_id == user1_id)
+            )
+        ).order_by(ChatMessage.timestamp.desc()).limit(limit)
+        
+        result = await db.execute(query)
+        messages = list(result.scalars().all())
+        return list(reversed(messages))  # Return in chronological order
+
+    @staticmethod
+    async def mark_messages_as_read(db: AsyncSession, current_user_id: int, partner_id: int):
+        """Mark all messages from partner as read"""
+        from sqlalchemy import update
+        
+        stmt = update(ChatMessage).where(
+            ChatMessage.sender_id == partner_id,
+            ChatMessage.recipient_id == current_user_id,
+            ChatMessage.is_read == False
+        ).values(is_read=True)
+        
+        await db.execute(stmt)
+        await db.commit()
+
+    @staticmethod
+    async def get_unread_counts(db: AsyncSession, user_id: int) -> dict:
+        """Get unread message counts per conversation partner"""
+        from sqlalchemy import select, func
+        
+        query = select(
+            ChatMessage.sender_id,
+            func.count(ChatMessage.id).label('count')
+        ).where(
+            ChatMessage.recipient_id == user_id,
+            ChatMessage.is_read == False
+        ).group_by(ChatMessage.sender_id)
+        
+        result = await db.execute(query)
+        counts = {row.sender_id: row.count for row in result}
+        return counts

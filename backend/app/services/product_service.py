@@ -1,0 +1,144 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_
+from fastapi import HTTPException, status
+
+from app.models.product import Product
+from app.models.company import CompanyType
+from app.models.user import User, UserRole
+from app.schemas.product import ProductCreate, ProductUpdate
+from app.services.link_service import LinkService
+
+
+class ProductService:
+    @staticmethod
+    async def create_product(db: AsyncSession, user: User, product_data: ProductCreate) -> Product:
+        """Supplier Owner/Manager creates a product"""
+        # Permission check
+        if user.role not in [UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]:
+            raise HTTPException(status_code=403, detail="Only Supplier Owners/Managers can create products")
+
+        # Check SKU uniqueness
+        result = await db.execute(select(Product).where(Product.sku == product_data.sku))
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="SKU already exists")
+
+        new_product = Product(
+            supplier_id=user.company_id,
+            name=product_data.name,
+            sku=product_data.sku,
+            price=product_data.price,
+            stock_quantity=product_data.stock_quantity,
+            min_order_qty=product_data.min_order_qty,
+            is_active=product_data.is_active
+        )
+        db.add(new_product)
+        await db.commit()
+        await db.refresh(new_product)
+        return new_product
+
+    @staticmethod
+    async def update_product(db: AsyncSession, product_id: int, user: User, product_data: ProductUpdate) -> Product:
+        """Supplier Owner/Manager updates a product"""
+        # Permission check
+        if user.role not in [UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]:
+            raise HTTPException(status_code=403, detail="Only Supplier Owners/Managers can update products")
+
+        product = await db.get(Product, product_id)
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        # Verify ownership
+        if product.supplier_id != user.company_id:
+            raise HTTPException(status_code=403, detail="You can only update your own products")
+
+        # Update fields
+        if product_data.name is not None:
+            product.name = product_data.name
+        if product_data.price is not None:
+            product.price = product_data.price
+        if product_data.stock_quantity is not None:
+            product.stock_quantity = product_data.stock_quantity
+        if product_data.min_order_qty is not None:
+            product.min_order_qty = product_data.min_order_qty
+        if product_data.is_active is not None:
+            product.is_active = product_data.is_active
+
+        await db.commit()
+        await db.refresh(product)
+        return product
+
+    @staticmethod
+    async def delete_product(db: AsyncSession, product_id: int, user: User):
+        """Supplier Owner/Manager deletes a product"""
+        # Permission check
+        if user.role not in [UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]:
+            raise HTTPException(status_code=403, detail="Only Supplier Owners/Managers can delete products")
+
+        product = await db.get(Product, product_id)
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        # Verify ownership
+        if product.supplier_id != user.company_id:
+            raise HTTPException(status_code=403, detail="You can only delete your own products")
+
+        await db.delete(product)
+        await db.commit()
+
+    @staticmethod
+    async def get_catalog_for_consumer(db: AsyncSession, consumer: User, supplier_id: int | None = None) -> list[Product]:
+        """
+        Get catalog for consumer - ONLY products from APPROVED suppliers.
+        This is the critical link-based filtering logic.
+        """
+        # Get approved supplier IDs for this consumer
+        approved_supplier_ids = await LinkService.get_approved_supplier_ids(db, consumer.company_id)
+
+        if not approved_supplier_ids:
+            return []
+
+        # Build query - only show active products with stock > 0
+        query = select(Product).where(
+            and_(
+                Product.supplier_id.in_(approved_supplier_ids),
+                Product.is_active == True,
+                Product.stock_quantity > 0
+            )
+        )
+
+        # Filter by specific supplier if requested
+        if supplier_id:
+            if supplier_id not in approved_supplier_ids:
+                raise HTTPException(status_code=403, detail="You don't have an approved link with this supplier")
+            query = query.where(Product.supplier_id == supplier_id)
+
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_supplier_catalog(db: AsyncSession, supplier: User) -> list[Product]:
+        """Get all products for supplier (for management)"""
+        result = await db.execute(
+            select(Product).where(Product.supplier_id == supplier.company_id)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_product_by_id(db: AsyncSession, product_id: int, user: User) -> Product:
+        """Get product by ID with permission check"""
+        product = await db.get(Product, product_id)
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        # If consumer, verify they have approved link with supplier
+        if user.role == UserRole.CONSUMER:
+            approved_supplier_ids = await LinkService.get_approved_supplier_ids(db, user.company_id)
+            if product.supplier_id not in approved_supplier_ids:
+                raise HTTPException(status_code=403, detail="Access denied - no approved link with supplier")
+
+        # If supplier, verify ownership
+        elif user.role in [UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER, UserRole.SUPPLIER_SALES]:
+            if product.supplier_id != user.company_id:
+                raise HTTPException(status_code=403, detail="Access denied - not your product")
+
+        return product
