@@ -109,6 +109,14 @@ class OrderService:
         )
         new_order = result.scalar_one()
         
+        # Send real-time notification to supplier company
+        from app.services.chat_service import manager
+        await manager.broadcast_to_company(
+            {"type": "order_update", "order_id": new_order.id},
+            order_data.supplier_id,
+            db
+        )
+        
         return new_order
 
     @staticmethod
@@ -158,7 +166,22 @@ class OrderService:
         result = await db.execute(
             select(Order).where(Order.id == order.id).options(selectinload(Order.items))
         )
-        return result.scalar_one()
+        updated_order = result.scalar_one()
+        
+        # Send real-time notification to both companies
+        from app.services.chat_service import manager
+        await manager.broadcast_to_company(
+            {"type": "order_update", "order_id": order.id},
+            order.supplier_id,
+            db
+        )
+        await manager.broadcast_to_company(
+            {"type": "order_update", "order_id": order.id},
+            order.consumer_id,
+            db
+        )
+        
+        return updated_order
 
     @staticmethod
     async def _decrement_inventory(db: AsyncSession, order: Order):

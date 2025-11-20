@@ -20,6 +20,15 @@ async def create_product(
     Create a new product (Supplier Owner/Manager only).
     """
     product = await ProductService.create_product(db, current_user, product_data)
+    
+    # Send real-time notification to company
+    from app.services.chat_service import manager
+    await manager.broadcast_to_company(
+        {"type": "product_update"},
+        current_user.company_id,
+        db
+    )
+    
     return product
 
 
@@ -34,6 +43,15 @@ async def update_product(
     Update an existing product (Supplier Owner/Manager only).
     """
     product = await ProductService.update_product(db, product_id, current_user, product_data)
+    
+    # Send real-time notification to company
+    from app.services.chat_service import manager
+    await manager.broadcast_to_company(
+        {"type": "product_update"},
+        current_user.company_id,
+        db
+    )
+    
     return product
 
 
@@ -47,6 +65,14 @@ async def delete_product(
     Delete a product (Supplier Owner/Manager only).
     """
     await ProductService.delete_product(db, product_id, current_user)
+    
+    # Send real-time notification to company
+    from app.services.chat_service import manager
+    await manager.broadcast_to_company(
+        {"type": "product_update"},
+        current_user.company_id,
+        db
+    )
 
 
 @router.get("/catalog", response_model=list[ProductResponse])

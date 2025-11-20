@@ -123,7 +123,12 @@ function ConsumerCatalog() {
     const [checkoutLoading, setCheckoutLoading] = useState(false);
 
     useEffect(() => {
-        api.getProducts().then(setProducts).catch(console.error);
+        const loadProducts = () => api.getProducts().then(setProducts).catch(console.error);
+        loadProducts();
+        
+        // Listen for real-time product updates
+        window.addEventListener('product_update', loadProducts);
+        return () => window.removeEventListener('product_update', loadProducts);
     }, []);
 
     const handleCheckout = async () => {
@@ -248,7 +253,12 @@ function ConsumerOrders() {
     const [complaintText, setComplaintText] = useState('');
 
     useEffect(() => {
-        api.getMyOrders().then(setMyOrders).catch(console.error);
+        const loadOrders = () => api.getMyOrders().then(setMyOrders).catch(console.error);
+        loadOrders();
+        
+        // Listen for real-time order updates
+        window.addEventListener('order_update', loadOrders);
+        return () => window.removeEventListener('order_update', loadOrders);
     }, []);
 
     const handleCreateComplaint = async (orderId: number) => {
@@ -356,6 +366,10 @@ function ConsumerComplaints() {
 
     useEffect(() => {
         loadComplaints();
+        
+        // Listen for real-time complaint updates
+        window.addEventListener('complaint_update', loadComplaints);
+        return () => window.removeEventListener('complaint_update', loadComplaints);
     }, []);
 
     const loadComplaints = () => {

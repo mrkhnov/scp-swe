@@ -30,6 +30,20 @@ class ConnectionManager:
             websocket = self.active_connections[user_id]
             await websocket.send_json(message)
 
+    async def broadcast_to_company(self, message: dict, company_id: int, db: AsyncSession):
+        """Broadcast a message to all connected users in a company"""
+        from sqlalchemy import select
+        # Get all users in the company
+        result = await db.execute(
+            select(User.id).where(User.company_id == company_id)
+        )
+        company_user_ids = [row[0] for row in result]
+        
+        # Send to all connected users from this company
+        for user_id in company_user_ids:
+            if user_id in self.active_connections:
+                await self.active_connections[user_id].send_json(message)
+
     async def broadcast(self, message: dict, exclude_user_id: int = None):
         """Broadcast a message to all connected users"""
         for user_id, connection in self.active_connections.items():

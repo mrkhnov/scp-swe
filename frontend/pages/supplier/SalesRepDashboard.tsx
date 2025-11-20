@@ -22,6 +22,18 @@ function Overview() {
 
     useEffect(() => {
         loadData();
+        
+        // Listen for real-time updates
+        const handleOrderUpdate = () => loadData();
+        const handleComplaintUpdate = () => loadData();
+        
+        window.addEventListener('order_update', handleOrderUpdate);
+        window.addEventListener('complaint_update', handleComplaintUpdate);
+        
+        return () => {
+            window.removeEventListener('order_update', handleOrderUpdate);
+            window.removeEventListener('complaint_update', handleComplaintUpdate);
+        };
     }, []);
 
     const loadData = async () => {
@@ -93,7 +105,12 @@ function OrdersView() {
     const [orders, setOrders] = useState<Order[]>([]);
 
     useEffect(() => {
-        api.getMyOrders().then(setOrders).catch(console.error);
+        const loadOrders = () => api.getMyOrders().then(setOrders).catch(console.error);
+        loadOrders();
+        
+        // Listen for real-time order updates
+        window.addEventListener('order_update', loadOrders);
+        return () => window.removeEventListener('order_update', loadOrders);
     }, []);
 
     return (
@@ -149,6 +166,12 @@ function ComplaintsView() {
 
     useEffect(() => {
         loadComplaints();
+        
+        // Listen for real-time complaint updates
+        const handleComplaintUpdate = () => loadComplaints();
+        window.addEventListener('complaint_update', handleComplaintUpdate);
+        
+        return () => window.removeEventListener('complaint_update', handleComplaintUpdate);
     }, []);
 
     const loadComplaints = async () => {

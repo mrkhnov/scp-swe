@@ -32,6 +32,15 @@ class ComplaintService:
         db.add(new_complaint)
         await db.commit()
         await db.refresh(new_complaint)
+        
+        # Send real-time notification to supplier company
+        from app.services.chat_service import manager
+        await manager.broadcast_to_company(
+            {"type": "complaint_update", "complaint_id": new_complaint.id},
+            order.supplier_id,
+            db
+        )
+        
         return new_complaint
 
     @staticmethod
@@ -62,6 +71,16 @@ class ComplaintService:
         complaint.handler_id = user.id
         await db.commit()
         await db.refresh(complaint)
+        
+        # Send real-time notification to supplier company
+        from app.services.chat_service import manager
+        order = await db.get(Order, complaint.order_id)
+        await manager.broadcast_to_company(
+            {"type": "complaint_update", "complaint_id": complaint.id},
+            order.supplier_id,
+            db
+        )
+        
         return complaint
 
     @staticmethod
@@ -109,6 +128,21 @@ class ComplaintService:
 
         await db.commit()
         await db.refresh(complaint)
+        
+        # Send real-time notification to both companies
+        from app.services.chat_service import manager
+        order = await db.get(Order, complaint.order_id)
+        await manager.broadcast_to_company(
+            {"type": "complaint_update", "complaint_id": complaint.id},
+            order.supplier_id,
+            db
+        )
+        await manager.broadcast_to_company(
+            {"type": "complaint_update", "complaint_id": complaint.id},
+            order.consumer_id,
+            db
+        )
+        
         return complaint
 
     @staticmethod
@@ -143,6 +177,21 @@ class ComplaintService:
         complaint.status = ComplaintStatus.RESOLVED
         await db.commit()
         await db.refresh(complaint)
+        
+        # Send real-time notification to both companies
+        from app.services.chat_service import manager
+        order = await db.get(Order, complaint.order_id)
+        await manager.broadcast_to_company(
+            {"type": "complaint_update", "complaint_id": complaint.id},
+            order.supplier_id,
+            db
+        )
+        await manager.broadcast_to_company(
+            {"type": "complaint_update", "complaint_id": complaint.id},
+            order.consumer_id,
+            db
+        )
+        
         return complaint
 
     @staticmethod

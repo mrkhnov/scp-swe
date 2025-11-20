@@ -112,6 +112,13 @@ export default function ChatPage() {
             try {
                 const msg = JSON.parse(event.data);
                 
+                // Handle real-time updates for complaints and orders
+                if (msg.type === 'complaint_update' || msg.type === 'order_update') {
+                    // Dispatch custom event for dashboards to listen to
+                    window.dispatchEvent(new CustomEvent(msg.type, { detail: msg }));
+                    return;
+                }
+                
                 // If message is for currently selected chat, add it
                 if (selectedPartner && (
                     (msg.sender_id === selectedPartner && msg.recipient_id === user.id) ||

@@ -100,7 +100,12 @@ function Inventory() {
     const [editForm, setEditForm] = useState<Partial<Product>>({});
 
     useEffect(() => {
-        api.getProducts().then(setProducts).catch(console.error);
+        const loadProducts = () => api.getProducts().then(setProducts).catch(console.error);
+        loadProducts();
+        
+        // Listen for real-time product updates
+        window.addEventListener('product_update', loadProducts);
+        return () => window.removeEventListener('product_update', loadProducts);
     }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -292,7 +297,12 @@ function OrderManagement() {
     const [orders, setOrders] = useState<Order[]>([]);
 
     useEffect(() => {
-        api.getMyOrders().then(setOrders).catch(console.error);
+        const loadOrders = () => api.getMyOrders().then(setOrders).catch(console.error);
+        loadOrders();
+        
+        // Listen for real-time order updates
+        window.addEventListener('order_update', loadOrders);
+        return () => window.removeEventListener('order_update', loadOrders);
     }, []);
 
     const handleOrder = async (id: number, status: string) => {
@@ -572,6 +582,10 @@ function ComplaintsManagement() {
 
     useEffect(() => {
         loadComplaints();
+        
+        // Listen for real-time complaint updates
+        window.addEventListener('complaint_update', loadComplaints);
+        return () => window.removeEventListener('complaint_update', loadComplaints);
     }, []);
 
     const loadComplaints = async () => {
