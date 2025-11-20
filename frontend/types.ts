@@ -6,6 +6,11 @@ export enum UserRole {
   SUPPLIER_SALES = 'SUPPLIER_SALES'
 }
 
+export enum CompanyType {
+  SUPPLIER = 'SUPPLIER',
+  CONSUMER = 'CONSUMER'
+}
+
 export enum LinkStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',

@@ -1,4 +1,4 @@
-import { User, UserRole, Link, Product, Order, Complaint, ChatMessage } from '../types';
+import { User, UserRole, Link, Product, Order, Complaint, ChatMessage, CompanyType } from '../types';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000';
@@ -10,6 +10,8 @@ interface UserRegistration {
   email: string;
   password: string;
   role: UserRole;
+  company_name?: string;
+  company_type?: CompanyType;
   company_id?: number | null;
 }
 
@@ -158,6 +160,24 @@ export const auth = {
   async logout(): Promise<void> {
     clearTokens();
   },
+
+  // Team management (Owner only)
+  async getCompanyUsers(): Promise<User[]> {
+    return apiRequest<User[]>('/auth/company/users');
+  },
+
+  async addCompanyUser(userData: UserRegistration): Promise<User> {
+    return apiRequest<User>('/auth/company/add-user', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+
+  async removeCompanyUser(userId: number): Promise<void> {
+    return apiRequest<void>(`/auth/company/remove-user/${userId}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 // Links API
@@ -288,6 +308,7 @@ export const api = {
   register: auth.register,
   login: auth.login,
   logout: auth.logout,
+  auth: auth, // Export the auth object for team management
   
   // Links
   getMyLinks: links.getMyLinks,

@@ -77,7 +77,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     </button>
                   </>
                 ) : (
-                  <>
+                  <>                                        
                     <button 
                       onClick={() => navigate('/supplier')} 
                       className={`transition-colors hover:text-system-text ${isActive('/supplier') ? 'text-system-text' : ''}`}
@@ -96,6 +96,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     >
                       Orders
                     </button>
+                    {user.role === UserRole.SUPPLIER_OWNER && (
+                      <button 
+                        onClick={() => navigate('/supplier/team')} 
+                        className={`transition-colors hover:text-system-text ${isActive('/supplier/team') ? 'text-system-text' : ''}`}
+                      >
+                        Team
+                      </button>
+                    )}
                   </>
                 )}
                 <button 

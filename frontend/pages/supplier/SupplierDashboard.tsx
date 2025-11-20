@@ -10,6 +10,7 @@ export default function SupplierDashboard() {
             <Route path="/" element={<Overview />} />
             <Route path="/products" element={<Inventory />} />
             <Route path="/orders" element={<OrderManagement />} />
+            <Route path="/team" element={<TeamManagement />} />
         </Routes>
     );
 }
@@ -353,6 +354,210 @@ function OrderManagement() {
                     </div>
                 ))}
                 {orders.length === 0 && <p className="text-center py-10 text-system-textSec">No orders yet.</p>}
+            </div>
+        </div>
+    );
+}
+
+function TeamManagement() {
+    const { user } = useApp();
+    const [companyUsers, setCompanyUsers] = useState<any[]>([]);
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [newUser, setNewUser] = useState({ email: '', password: '', role: UserRole.SUPPLIER_MANAGER });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // Only allow access for Supplier Owner
+    if (user?.role !== UserRole.SUPPLIER_OWNER) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-system-textSec">
+                <span className="text-4xl mb-4">🚫</span>
+                <h2 className="text-xl font-semibold text-system-text">Access Denied</h2>
+                <p className="mt-2">Only Supplier Owners can manage team members.</p>
+            </div>
+        );
+    }
+
+    useEffect(() => {
+        loadCompanyUsers();
+    }, []);
+
+    const loadCompanyUsers = async () => {
+        try {
+            const users = await api.auth.getCompanyUsers();
+            setCompanyUsers(users);
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
+    const handleAddUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+
+        try {
+            await api.auth.addCompanyUser(newUser);
+            await loadCompanyUsers();
+            setNewUser({ email: '', password: '', role: UserRole.SUPPLIER_MANAGER });
+            setShowAddForm(false);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemoveUser = async (userId: number, userEmail: string) => {
+        if (!confirm(`Are you sure you want to remove ${userEmail} from your company?`)) {
+            return;
+        }
+
+        try {
+            await api.auth.removeCompanyUser(userId);
+            await loadCompanyUsers();
+        } catch (err: any) {
+            alert(err.message);
+        }
+    };
+
+    const getRoleDisplayName = (role: UserRole) => {
+        switch (role) {
+            case UserRole.SUPPLIER_OWNER: return 'Owner';
+            case UserRole.SUPPLIER_MANAGER: return 'Manager';
+            case UserRole.SUPPLIER_SALES: return 'Sales Rep';
+            default: return role;
+        }
+    };
+
+    return (
+        <div className="space-y-8 animate-in fade-in">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-system-text tracking-tight">Team Management</h2>
+                    <p className="text-system-textSec">Manage your company's team members</p>
+                </div>
+                <button
+                    onClick={() => setShowAddForm(true)}
+                    className="bg-system-text text-white px-6 py-3 rounded-xl font-medium hover:bg-black transition-colors"
+                >
+                    Add Team Member
+                </button>
+            </div>
+
+            {error && (
+                <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg">
+                    {error}
+                </div>
+            )}
+
+            {/* Add User Form */}
+            {showAddForm && (
+                <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
+                    <h3 className="text-lg font-semibold text-system-text mb-6">Add New Team Member</h3>
+                    <form onSubmit={handleAddUser} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">Email</label>
+                                <input
+                                    type="email"
+                                    required
+                                    className="w-full px-4 py-3 bg-system-bg border-0 rounded-xl text-system-text outline-none focus:ring-2 focus:ring-system-blue"
+                                    value={newUser.email}
+                                    onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                                    placeholder="team.member@company.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">Password</label>
+                                <input
+                                    type="password"
+                                    required
+                                    className="w-full px-4 py-3 bg-system-bg border-0 rounded-xl text-system-text outline-none focus:ring-2 focus:ring-system-blue"
+                                    value={newUser.password}
+                                    onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                                    placeholder="Minimum 8 characters"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">Role</label>
+                            <select
+                                className="w-full px-4 py-3 bg-system-bg border-0 rounded-xl text-system-text outline-none focus:ring-2 focus:ring-system-blue"
+                                value={newUser.role}
+                                onChange={e => setNewUser({ ...newUser, role: e.target.value as UserRole })}
+                            >
+                                <option value={UserRole.SUPPLIER_MANAGER}>Manager</option>
+                                <option value={UserRole.SUPPLIER_SALES}>Sales Rep</option>
+                            </select>
+                        </div>
+                        <div className="flex gap-4">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="bg-system-text text-white px-6 py-3 rounded-xl font-medium hover:bg-black transition-colors disabled:opacity-50"
+                            >
+                                {loading ? 'Adding...' : 'Add User'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowAddForm(false);
+                                    setNewUser({ email: '', password: '', role: UserRole.SUPPLIER_MANAGER });
+                                    setError('');
+                                }}
+                                className="bg-white border border-system-border text-system-textSec px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* Team Members List */}
+            <div className="bg-white rounded-3xl shadow-card border border-system-border/50 overflow-hidden">
+                <div className="p-6 border-b border-system-border">
+                    <h3 className="text-lg font-semibold text-system-text">Current Team Members</h3>
+                </div>
+                <div className="divide-y divide-system-border/50">
+                    {companyUsers.map(teamUser => (
+                        <div key={teamUser.id} className="p-6 flex items-center justify-between hover:bg-system-bg/30 transition-colors">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-system-blue/10 rounded-full flex items-center justify-center">
+                                    <span className="text-system-blue font-semibold text-lg">
+                                        {teamUser.email.charAt(0).toUpperCase()}
+                                    </span>
+                                </div>
+                                <div>
+                                    <div className="font-medium text-system-text">{teamUser.email}</div>
+                                    <div className="text-sm text-system-textSec">{getRoleDisplayName(teamUser.role)}</div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                    teamUser.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                    {teamUser.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                                {teamUser.role !== UserRole.SUPPLIER_OWNER && (
+                                    <button
+                                        onClick={() => handleRemoveUser(teamUser.id, teamUser.email)}
+                                        className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+                                    >
+                                        Remove
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {companyUsers.length === 0 && (
+                    <div className="p-12 text-center text-system-textSec">
+                        <span className="text-4xl mb-4 block">👥</span>
+                        <p>No team members yet. Add some to get started!</p>
+                    </div>
+                )}
             </div>
         </div>
     );

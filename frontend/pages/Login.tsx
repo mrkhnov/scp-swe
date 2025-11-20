@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, setTokens, getUserFromToken } from '../services/api';
 import { useApp } from '../App';
-import { UserRole } from '../types';
+import { UserRole, CompanyType } from '../types';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,7 +11,8 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.CONSUMER);
-  const [companyId, setCompanyId] = useState('1'); 
+  const [companyName, setCompanyName] = useState('');
+  const [companyType, setCompanyType] = useState<CompanyType>(CompanyType.CONSUMER);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,13 +23,30 @@ export default function Login() {
 
     try {
       if (isRegister) {
-        const parsedCompanyId = companyId ? parseInt(companyId) : null;
-        await api.register({ 
+        const registrationData: any = { 
           email, 
           password, 
-          role, 
-          company_id: parsedCompanyId === 0 ? null : parsedCompanyId 
-        });
+          role
+        };
+        
+        // Add company info for Supplier Owner
+        if (role === UserRole.SUPPLIER_OWNER) {
+          if (!companyName.trim()) {
+            setError('Company name is required for Supplier Owner');
+            setLoading(false);
+            return;
+          }
+          registrationData.company_name = companyName;
+          registrationData.company_type = CompanyType.SUPPLIER;
+        } else if (role === UserRole.CONSUMER) {
+          // Consumer can optionally provide company name
+          if (companyName.trim()) {
+            registrationData.company_name = companyName;
+          }
+          registrationData.company_type = CompanyType.CONSUMER;
+        }
+        
+        await api.register(registrationData);
         setIsRegister(false);
         setError('Registration successful. Please sign in.');
       } else {
@@ -40,6 +58,7 @@ export default function Login() {
         else navigate('/supplier');
       }
     } catch (err: any) {
+      console.error('Registration error:', err);
       setError(err.message || 'Action failed');
     } finally {
       setLoading(false);
@@ -99,22 +118,69 @@ export default function Login() {
                 <select 
                   className="w-full px-4 py-3 bg-system-bg border-0 rounded-xl text-system-text focus:ring-2 focus:ring-system-blue outline-none appearance-none"
                   value={role}
-                  onChange={e => setRole(e.target.value as UserRole)}
+                    onChange={e => {
+                    const newRole = e.target.value as UserRole;
+                    setRole(newRole);
+                    // Auto-set company type based on role
+                    if (newRole === UserRole.SUPPLIER_OWNER) {
+                      setCompanyType(CompanyType.SUPPLIER);
+                    } else if (newRole === UserRole.CONSUMER) {
+                      setCompanyType(CompanyType.CONSUMER);
+                    }
+                    // Reset company name
+                    setCompanyName('');
+                  }}
                 >
                   <option value={UserRole.CONSUMER}>Consumer (Restaurant/Hotel)</option>
                   <option value={UserRole.SUPPLIER_OWNER}>Supplier Owner</option>
                 </select>
               </div>
-              <div>
-                 <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">Company ID (Demo)</label>
-                 <input 
-                  type="number" 
-                  className="w-full px-4 py-3 bg-system-bg border-0 rounded-xl text-system-text outline-none focus:ring-2 focus:ring-system-blue"
-                  value={companyId}
-                  onChange={e => setCompanyId(e.target.value)}
-                 />
-                 <p className="text-[10px] text-system-textSec mt-1.5 ml-1">1 for Supplier, 2 for Consumer</p>
-              </div>
+              
+              {role === UserRole.SUPPLIER_OWNER && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">
+                      Company Name <span className="text-system-red">*</span>
+                    </label>
+                    <input 
+                      type="text" 
+                      required
+                      className="w-full px-4 py-3 bg-system-bg border-0 rounded-xl text-system-text outline-none focus:ring-2 focus:ring-system-blue placeholder-gray-400"
+                      placeholder="Your Company Name"
+                      value={companyName}
+                      onChange={e => setCompanyName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">
+                      Company Type
+                    </label>
+                    <input 
+                      type="text" 
+                      disabled
+                      className="w-full px-4 py-3 bg-gray-100 border-0 rounded-xl text-gray-600 outline-none cursor-not-allowed"
+                      value="SUPPLIER"
+                    />
+                    <p className="text-[10px] text-system-textSec mt-1.5 ml-1">Auto-filled for Supplier Owner</p>
+                  </div>
+                </>
+              )}
+              
+              {role === UserRole.CONSUMER && (
+                <div>
+                  <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">
+                    Company Name (Optional)
+                  </label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 bg-system-bg border-0 rounded-xl text-system-text outline-none focus:ring-2 focus:ring-system-blue placeholder-gray-400"
+                    placeholder="Your Restaurant/Hotel Name"
+                    value={companyName}
+                    onChange={e => setCompanyName(e.target.value)}
+                  />
+                  <p className="text-[10px] text-system-textSec mt-1.5 ml-1">Auto-generated if not provided</p>
+                </div>
+              )}
             </div>
           )}
 
