@@ -41,6 +41,14 @@ export interface User {
   company_id?: number;
 }
 
+export interface Company {
+  id: number;
+  name: string;
+  type: CompanyType;
+  kyb_status: boolean;
+  is_active: boolean;
+}
+
 export interface TokenResponse {
   access_token: string;
   refresh_token: string;
@@ -97,6 +105,8 @@ export interface Complaint {
   created_by: number | null;  // User ID who created the complaint
   consumer_id: number;  // Company ID
   handler_id?: number;
+  handler_name?: string;  // Email of the handler
+  handler_role?: string;  // Role of the handler
   status: ComplaintStatus;
   description: string;
 }

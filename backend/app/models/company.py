@@ -14,6 +14,7 @@ class Company(Base):
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     type: Mapped[CompanyType] = mapped_column(Enum(CompanyType), nullable=False)
     kyb_status: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     users: Mapped[list["User"]] = relationship(back_populates="company")
     products: Mapped[list["Product"]] = relationship(back_populates="supplier")

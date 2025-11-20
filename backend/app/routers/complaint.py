@@ -21,14 +21,16 @@ async def create_complaint(
     Both Consumer and Supplier can create complaints.
     """
     complaint = await ComplaintService.create_complaint(db, current_user, complaint_data)
-    # Reload with order relationship
-    await db.refresh(complaint, ["order"])
+    # Reload with order and handler relationships
+    await db.refresh(complaint, ["order", "handler"])
     return ComplaintResponse(
         id=complaint.id,
         order_id=complaint.order_id,
         created_by=complaint.created_by,
         consumer_id=complaint.order.consumer_id,
         handler_id=complaint.handler_id,
+        handler_name=complaint.handler.email if complaint.handler else None,
+        handler_role=complaint.handler.role.value if complaint.handler else None,
         status=complaint.status,
         description=complaint.description
     )
@@ -44,13 +46,15 @@ async def assign_complaint(
     Sales Rep assigns themselves to handle a complaint.
     """
     complaint = await ComplaintService.assign_complaint(db, complaint_id, current_user)
-    await db.refresh(complaint, ["order"])
+    await db.refresh(complaint, ["order", "handler"])
     return ComplaintResponse(
         id=complaint.id,
         order_id=complaint.order_id,
         created_by=complaint.created_by,
         consumer_id=complaint.order.consumer_id,
         handler_id=complaint.handler_id,
+        handler_name=complaint.handler.email if complaint.handler else None,
+        handler_role=complaint.handler.role.value if complaint.handler else None,
         status=complaint.status,
         description=complaint.description
     )
@@ -70,13 +74,15 @@ async def escalate_complaint(
     Consumer can escalate RESOLVED complaints if not satisfied.
     """
     complaint = await ComplaintService.escalate_complaint(db, complaint_id, current_user, escalate_data)
-    await db.refresh(complaint, ["order"])
+    await db.refresh(complaint, ["order", "handler"])
     return ComplaintResponse(
         id=complaint.id,
         order_id=complaint.order_id,
         created_by=complaint.created_by,
         consumer_id=complaint.order.consumer_id,
         handler_id=complaint.handler_id,
+        handler_name=complaint.handler.email if complaint.handler else None,
+        handler_role=complaint.handler.role.value if complaint.handler else None,
         status=complaint.status,
         description=complaint.description
     )
@@ -94,13 +100,15 @@ async def resolve_complaint(
     Manager can resolve any complaint.
     """
     complaint = await ComplaintService.resolve_complaint(db, complaint_id, current_user)
-    await db.refresh(complaint, ["order"])
+    await db.refresh(complaint, ["order", "handler"])
     return ComplaintResponse(
         id=complaint.id,
         order_id=complaint.order_id,
         created_by=complaint.created_by,
         consumer_id=complaint.order.consumer_id,
         handler_id=complaint.handler_id,
+        handler_name=complaint.handler.email if complaint.handler else None,
+        handler_role=complaint.handler.role.value if complaint.handler else None,
         status=complaint.status,
         description=complaint.description
     )
@@ -122,6 +130,8 @@ async def get_complaints(
             created_by=c.created_by,
             consumer_id=c.order.consumer_id,
             handler_id=c.handler_id,
+            handler_name=c.handler.email if c.handler else None,
+            handler_role=c.handler.role.value if c.handler else None,
             status=c.status,
             description=c.description
         )

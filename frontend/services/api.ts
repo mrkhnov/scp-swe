@@ -183,6 +183,23 @@ export const auth = {
   async getChatPartners(): Promise<User[]> {
     return apiRequest<User[]>('/auth/sales-reps');
   },
+
+  async getCompanySettings(): Promise<any> {
+    return apiRequest<any>('/auth/company/settings');
+  },
+
+  async updateCompanySettings(settings: { name?: string; kyb_status?: boolean; is_active?: boolean }): Promise<any> {
+    return apiRequest<any>('/auth/company/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  },
+
+  async deleteCompany(): Promise<void> {
+    return apiRequest<void>('/auth/company', {
+      method: 'DELETE',
+    });
+  },
 };
 
 // Links API

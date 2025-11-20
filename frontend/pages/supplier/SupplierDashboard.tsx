@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
-import { Link, LinkStatus, Order, OrderStatus, Product, UserRole, Complaint, ComplaintStatus } from '../../types';
+import { Link, LinkStatus, Order, OrderStatus, Product, UserRole, Complaint, ComplaintStatus, Company } from '../../types';
 import { useApp } from '../../App';
 
 export default function SupplierDashboard() {
@@ -12,6 +12,7 @@ export default function SupplierDashboard() {
             <Route path="/orders" element={<OrderManagement />} />
             <Route path="/complaints" element={<ComplaintsManagement />} />
             <Route path="/team" element={<TeamManagement />} />
+            <Route path="/settings" element={<CompanySettings />} />
         </Routes>
     );
 }
@@ -627,6 +628,11 @@ function ComplaintsManagement() {
                                         <p className="text-xs text-system-textSec mt-1">
                                             Order #{complaint.order_id}
                                             {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                            {complaint.handler_name && (
+                                                <span className="block mt-1 text-red-700 font-medium">
+                                                    Handler: {complaint.handler_name} ({complaint.handler_role})
+                                                </span>
+                                            )}
                                         </p>
                                         <span className="inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
                                             ESCALATED
@@ -674,13 +680,200 @@ function ComplaintsManagement() {
                                     </div>
                                 </div>
                                 <p className="text-sm text-system-text">{complaint.description}</p>
-                                {complaint.handler_id && (
-                                    <p className="text-xs text-system-textSec mt-3">Handled by: Sales Rep #{complaint.handler_id}</p>
+                                {complaint.handler_name && (
+                                    <p className="text-xs text-system-textSec mt-3">
+                                        Handler: {complaint.handler_name} 
+                                        <span className="ml-1 px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
+                                            {complaint.handler_role === 'SUPPLIER_SALES' ? 'Sales Rep' : 'Manager'}
+                                        </span>
+                                    </p>
                                 )}
                             </div>
                         ))}
                     </div>
                 )}
+            </div>
+        </div>
+    );
+}
+
+function CompanySettings() {
+    const { user, setUser } = useApp();
+    const navigate = useNavigate();
+    const [company, setCompany] = useState<Company | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [companyName, setCompanyName] = useState('');
+    const [isActive, setIsActive] = useState(true);
+
+    useEffect(() => {
+        loadSettings();
+    }, []);
+
+    const loadSettings = async () => {
+        try {
+            const data = await api.auth.getCompanySettings();
+            setCompany(data);
+            setCompanyName(data.name);
+            setIsActive(data.is_active);
+        } catch (error) {
+            console.error('Failed to load company settings:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSaveSettings = async () => {
+        if (!companyName.trim()) {
+            alert('Company name cannot be empty');
+            return;
+        }
+
+        try {
+            await api.auth.updateCompanySettings({ name: companyName });
+            alert('Settings saved successfully');
+            loadSettings();
+        } catch (err: any) {
+            alert(err.message || 'Failed to save settings');
+        }
+    };
+
+    const handleToggleActive = async () => {
+        const newStatus = !isActive;
+        const confirmMsg = newStatus 
+            ? 'Activate company? All team members will be able to log in.'
+            : 'Deactivate company? All team members will be unable to log in.';
+        
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            await api.auth.updateCompanySettings({ is_active: newStatus });
+            setIsActive(newStatus);
+            alert(`Company ${newStatus ? 'activated' : 'deactivated'} successfully`);
+            loadSettings();
+        } catch (err: any) {
+            alert(err.message || 'Failed to update company status');
+        }
+    };
+
+    const handleDeleteCompany = async () => {
+        if (!confirm('⚠️ DELETE COMPANY?\n\nThis will permanently delete your company and all associated data including:\n- All team members\n- All products\n- All orders\n- All links\n\nThis action CANNOT be undone!\n\nType "DELETE" in the next prompt to confirm.')) {
+            return;
+        }
+
+        const confirmation = prompt('Type DELETE to confirm company deletion:');
+        if (confirmation !== 'DELETE') {
+            alert('Deletion cancelled');
+            return;
+        }
+
+        try {
+            await api.auth.deleteCompany();
+            alert('Company deleted successfully. You will be logged out.');
+            setUser(null);
+            navigate('/login');
+        } catch (err: any) {
+            alert(err.message || 'Failed to delete company');
+        }
+    };
+
+    if (loading) return <div>Loading settings...</div>;
+
+    return (
+        <div className="space-y-8 animate-in fade-in">
+            <div>
+                <h2 className="text-2xl font-bold text-system-text tracking-tight">Company Settings</h2>
+                <p className="text-system-textSec">Manage your company information and status</p>
+            </div>
+
+            {/* Company Information */}
+            <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
+                <h3 className="text-lg font-semibold text-system-text mb-6">Company Information</h3>
+                <div className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-medium text-system-text mb-2">
+                            Company Name
+                        </label>
+                        <input
+                            type="text"
+                            value={companyName}
+                            onChange={(e) => setCompanyName(e.target.value)}
+                            className="w-full px-4 py-2 border border-system-border rounded-lg focus:outline-none focus:ring-2 focus:ring-system-blue"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-system-text mb-2">
+                            Company Type
+                        </label>
+                        <div className="px-4 py-2 bg-system-bg rounded-lg text-system-textSec">
+                            {company?.type}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-system-text mb-2">
+                            KYB Status
+                        </label>
+                        <div className={`px-4 py-2 rounded-lg inline-block ${
+                            company?.kyb_status ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                            {company?.kyb_status ? 'Verified' : 'Pending Verification'}
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleSaveSettings}
+                        className="bg-system-blue text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+                    >
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+
+            {/* Company Status */}
+            <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
+                <h3 className="text-lg font-semibold text-system-text mb-6">Company Status</h3>
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between p-4 bg-system-bg rounded-lg">
+                        <div>
+                            <div className="font-medium text-system-text">Company Active</div>
+                            <div className="text-sm text-system-textSec">
+                                {isActive 
+                                    ? 'Company is active. All team members can log in.' 
+                                    : 'Company is deactivated. No team members can log in.'}
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleToggleActive}
+                            className={`px-6 py-2 rounded-lg font-medium ${
+                                isActive 
+                                    ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                                    : 'bg-green-500 text-white hover:bg-green-600'
+                            }`}
+                        >
+                            {isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Danger Zone */}
+            <div className="bg-white p-8 rounded-3xl shadow-card border border-red-200">
+                <h3 className="text-lg font-semibold text-red-600 mb-6">Danger Zone</h3>
+                <div className="space-y-4">
+                    <div className="p-4 border border-red-200 rounded-lg">
+                        <div className="font-medium text-system-text mb-2">Delete Company</div>
+                        <div className="text-sm text-system-textSec mb-4">
+                            Permanently delete your company and all associated data. This action cannot be undone.
+                        </div>
+                        <button
+                            onClick={handleDeleteCompany}
+                            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 font-medium"
+                        >
+                            Delete Company
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );

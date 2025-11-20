@@ -16,6 +16,8 @@ class ComplaintResponse(BaseModel):
     created_by: int | None  # User ID who created the complaint
     consumer_id: int  # Company ID of the consumer
     handler_id: int | None
+    handler_name: str | None = None  # Name/email of the handler
+    handler_role: str | None = None  # Role of the handler (SUPPLIER_SALES, SUPPLIER_MANAGER)
     status: ComplaintStatus
     description: str
 

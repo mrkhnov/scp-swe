@@ -99,6 +99,12 @@ class AuthService:
 
         if not user.is_active:
             raise HTTPException(status_code=400, detail="Inactive user account")
+        
+        # Check if company is active
+        if user.company_id:
+            company = await db.get(Company, user.company_id)
+            if company and not company.is_active:
+                raise HTTPException(status_code=400, detail="Company account is deactivated")
 
         access_token = create_access_token(user.email, user.role.value, user.id)
         refresh_token = create_refresh_token(user.email, user.role.value, user.id)

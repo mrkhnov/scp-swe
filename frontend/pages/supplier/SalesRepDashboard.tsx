@@ -193,7 +193,10 @@ function ComplaintsView() {
         }
     };
 
-    const openComplaints = complaints.filter(c => c.status === ComplaintStatus.OPEN);
+    // Separate complaints by assignment status
+    const myComplaints = complaints.filter(c => c.handler_id === user?.id && c.status === ComplaintStatus.OPEN);
+    const unassignedComplaints = complaints.filter(c => !c.handler_id && c.status === ComplaintStatus.OPEN);
+    const otherAssignedComplaints = complaints.filter(c => c.handler_id && c.handler_id !== user?.id && c.status === ComplaintStatus.OPEN);
     const escalatedComplaints = complaints.filter(c => c.status === ComplaintStatus.ESCALATED);
 
     return (
@@ -203,15 +206,66 @@ function ComplaintsView() {
                 <p className="text-system-textSec">Communicate with customers about their complaints via chat</p>
             </div>
 
-            {/* Open Complaints */}
-            {openComplaints.length > 0 && (
+            {/* My Complaints - Currently Handling */}
+            {myComplaints.length > 0 && (
+                <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
+                    <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-system-green rounded-full"></span>
+                        My Complaints
+                    </h3>
+                    <div className="space-y-4">
+                        {myComplaints.map(complaint => (
+                            <div key={complaint.id} className="p-5 bg-green-50 rounded-2xl border border-green-200">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <p className="text-xs text-system-textSec mt-1">
+                                            Order #{complaint.order_id}
+                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                            {complaint.handler_name && (
+                                                <span className="block mt-1 text-green-700 font-medium">
+                                                    Handling: {complaint.handler_name} ({complaint.handler_role})
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleReplyInChat(complaint)}
+                                            className="bg-system-blue text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600"
+                                        >
+                                            Reply in Chat
+                                        </button>
+                                        <button
+                                            onClick={() => handleResolve(complaint.id)}
+                                            className="bg-system-green text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600"
+                                        >
+                                            Resolve
+                                        </button>
+                                        <button
+                                            onClick={() => handleEscalate(complaint.id)}
+                                            className="bg-system-red text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700"
+                                        >
+                                            Escalate
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-system-text">{complaint.description}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Unassigned Complaints - Available to Handle */}
+            {unassignedComplaints.length > 0 && (
                 <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
                     <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
                         <span className="w-2 h-2 bg-system-blue rounded-full"></span>
-                        Open Complaints
+                        Unassigned Complaints
                     </h3>
                     <div className="space-y-4">
-                        {openComplaints.map(complaint => (
+                        {unassignedComplaints.map(complaint => (
                             <div key={complaint.id} className="p-5 bg-system-bg rounded-2xl border border-system-border/50">
                                 <div className="flex justify-between items-start mb-3">
                                     <div>
@@ -241,6 +295,40 @@ function ComplaintsView() {
                                             Escalate
                                         </button>
                                     </div>
+                                </div>
+                                <p className="text-sm text-system-text">{complaint.description}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Other Sales Reps' Complaints - Read Only */}
+            {otherAssignedComplaints.length > 0 && (
+                <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
+                    <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                        Being Handled by Other Sales Reps
+                    </h3>
+                    <div className="space-y-4">
+                        {otherAssignedComplaints.map(complaint => (
+                            <div key={complaint.id} className="p-5 bg-yellow-50 rounded-2xl border border-yellow-200 opacity-75">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <p className="text-xs text-system-textSec mt-1">
+                                            Order #{complaint.order_id}
+                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                            {complaint.handler_name && (
+                                                <span className="block mt-1 text-yellow-700 font-medium">
+                                                    Handler: {complaint.handler_name} ({complaint.handler_role})
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                                        {complaint.handler_role === 'SUPPLIER_SALES' ? 'Sales Rep' : 'Manager'}
+                                    </span>
                                 </div>
                                 <p className="text-sm text-system-text">{complaint.description}</p>
                             </div>

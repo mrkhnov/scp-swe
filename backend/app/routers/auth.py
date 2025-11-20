@@ -4,9 +4,11 @@ from sqlalchemy import select
 
 from app.db.session import get_db
 from app.schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse
+from app.schemas.company import CompanyResponse, CompanyUpdate
 from app.services.auth_service import AuthService
 from app.core.security import get_current_user
 from app.models.user import User, UserRole
+from app.models.company import Company
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -170,3 +172,97 @@ async def get_available_sales_reps(
             )
         )
         return result.scalars().all()
+
+
+@router.get("/company/settings", response_model=CompanyResponse)
+async def get_company_settings(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get current user's company settings (Owner only).
+    """
+    if current_user.role != UserRole.SUPPLIER_OWNER:
+        raise HTTPException(status_code=403, detail="Only Supplier Owners can view company settings")
+    
+    if not current_user.company_id:
+        raise HTTPException(status_code=400, detail="User has no associated company")
+    
+    company = await db.get(Company, current_user.company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    return company
+
+
+@router.put("/company/settings", response_model=CompanyResponse)
+async def update_company_settings(
+    company_update: CompanyUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update company settings (Owner only).
+    """
+    if current_user.role != UserRole.SUPPLIER_OWNER:
+        raise HTTPException(status_code=403, detail="Only Supplier Owners can update company settings")
+    
+    if not current_user.company_id:
+        raise HTTPException(status_code=400, detail="User has no associated company")
+    
+    company = await db.get(Company, current_user.company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Update fields if provided
+    if company_update.name is not None:
+        # Check if name is already taken by another company
+        result = await db.execute(
+            select(Company).where(Company.name == company_update.name, Company.id != company.id)
+        )
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Company name already exists")
+        company.name = company_update.name
+    
+    if company_update.kyb_status is not None:
+        company.kyb_status = company_update.kyb_status
+    
+    if company_update.is_active is not None:
+        company.is_active = company_update.is_active
+        # If deactivating, deactivate all users
+        if not company_update.is_active:
+            result = await db.execute(
+                select(User).where(User.company_id == company.id)
+            )
+            users = result.scalars().all()
+            for user in users:
+                user.is_active = False
+    
+    await db.commit()
+    await db.refresh(company)
+    return company
+
+
+@router.delete("/company", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_company(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete the company and all associated users (Owner only).
+    """
+    if current_user.role != UserRole.SUPPLIER_OWNER:
+        raise HTTPException(status_code=403, detail="Only Supplier Owners can delete the company")
+    
+    if not current_user.company_id:
+        raise HTTPException(status_code=400, detail="User has no associated company")
+    
+    company = await db.get(Company, current_user.company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Delete company (cascades to users and other related entities)
+    await db.delete(company)
+    await db.commit()
+    
+    return None

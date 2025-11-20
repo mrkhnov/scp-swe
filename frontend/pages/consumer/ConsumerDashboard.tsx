@@ -410,8 +410,13 @@ function ConsumerComplaints() {
                             </div>
                         </div>
                         <p className="text-sm text-system-text">{complaint.description}</p>
-                        {complaint.handler_id && (
-                            <p className="text-xs text-system-textSec mt-3">Assigned to Sales Rep #{complaint.handler_id}</p>
+                        {complaint.handler_name && (
+                            <p className="text-xs text-system-textSec mt-3">
+                                Handler: {complaint.handler_name} 
+                                <span className="ml-1 px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
+                                    {complaint.handler_role === 'SUPPLIER_SALES' ? 'Sales Rep' : 'Manager'}
+                                </span>
+                            </p>
                         )}
                     </div>
                 ))}

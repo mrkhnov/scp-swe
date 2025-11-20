@@ -52,6 +52,13 @@ class ComplaintService:
         if complaint.status == ComplaintStatus.RESOLVED:
             raise HTTPException(status_code=400, detail="Complaint is already resolved")
 
+        # Prevent assigning if another Sales Rep is already handling it
+        if complaint.handler_id and complaint.handler_id != user.id:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"This complaint is already being handled by another Sales Rep (ID: {complaint.handler_id})"
+            )
+
         complaint.handler_id = user.id
         await db.commit()
         await db.refresh(complaint)
@@ -116,10 +123,20 @@ class ComplaintService:
         if user.role in [UserRole.SUPPLIER_SALES, UserRole.SUPPLIER_MANAGER]:
             if order.supplier_id != user.company_id:
                 raise HTTPException(status_code=403, detail="Not your company's complaint")
-            # Sales can resolve if they're the handler or if it's OPEN
-            # Manager can resolve any escalated or open complaint
-            if user.role == UserRole.SUPPLIER_SALES and complaint.handler_id != user.id and complaint.status != ComplaintStatus.OPEN:
-                raise HTTPException(status_code=403, detail="You can only resolve complaints you are handling")
+            
+            # Sales Rep exclusive handling logic
+            if user.role == UserRole.SUPPLIER_SALES:
+                # If complaint has a handler and it's not this user, reject
+                if complaint.handler_id and complaint.handler_id != user.id:
+                    raise HTTPException(
+                        status_code=403, 
+                        detail=f"This complaint is being handled by another Sales Rep (ID: {complaint.handler_id})"
+                    )
+                # If complaint is unassigned, auto-assign to this user
+                if not complaint.handler_id:
+                    complaint.handler_id = user.id
+            
+            # Manager can resolve any complaint
         else:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
 
@@ -137,7 +154,7 @@ class ComplaintService:
                 select(Complaint)
                 .join(Order)
                 .where(Order.consumer_id == user.company_id)
-                .options(selectinload(Complaint.order))
+                .options(selectinload(Complaint.order), selectinload(Complaint.handler))
             )
         elif user.role in [UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER, UserRole.SUPPLIER_SALES]:
             # Get complaints for orders from supplier's company
@@ -145,7 +162,7 @@ class ComplaintService:
                 select(Complaint)
                 .join(Order)
                 .where(Order.supplier_id == user.company_id)
-                .options(selectinload(Complaint.order))
+                .options(selectinload(Complaint.order), selectinload(Complaint.handler))
             )
         else:
             return []

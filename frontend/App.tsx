@@ -131,12 +131,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       Complaints
                     </button>
                     {user.role === UserRole.SUPPLIER_OWNER && (
-                      <button 
-                        onClick={() => navigate('/supplier/team')} 
-                        className={`transition-colors hover:text-system-text ${isActive('/supplier/team') ? 'text-system-text' : ''}`}
-                      >
-                        Team
-                      </button>
+                      <>
+                        <button 
+                          onClick={() => navigate('/supplier/team')} 
+                          className={`transition-colors hover:text-system-text ${isActive('/supplier/team') ? 'text-system-text' : ''}`}
+                        >
+                          Team
+                        </button>
+                        <button 
+                          onClick={() => navigate('/supplier/settings')} 
+                          className={`transition-colors hover:text-system-text ${isActive('/supplier/settings') ? 'text-system-text' : ''}`}
+                        >
+                          Settings
+                        </button>
+                      </>
                     )}
                   </>
                 )}
