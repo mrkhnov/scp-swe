@@ -121,8 +121,7 @@ export default function ChatPage() {
                     return;
                 }
                 
-                // Handle real-time updates for complaints and orders
-                if (msg.type === 'complaint_update' || msg.type === 'order_update') {
+                                if (msg.type === 'complaint_update' || msg.type === 'order_update') {
                     // Dispatch custom event for dashboards to listen to
                     window.dispatchEvent(new CustomEvent(msg.type, { detail: msg }));
                     return;
@@ -130,27 +129,25 @@ export default function ChatPage() {
                 
                 // Handle both "message" and "sent" types (sent is echo back to sender)
                 if (msg.type === 'message' || msg.type === 'sent') {
-                    // If message is for currently selected chat, add it
-                    if (selectedPartner && (
-                        (msg.sender_id === selectedPartner && msg.recipient_id === user.id) ||
-                        (msg.sender_id === user.id && msg.recipient_id === selectedPartner)
-                    )) {
-                        setMessages(prev => {
-                            if (prev.some(m => m.id === msg.id)) return prev;
-                            return [...prev, msg];
-                        });
-                        if (msg.sender_id === selectedPartner) {
-                            setUnreadCounts(prev => ({ ...prev, [selectedPartner]: 0 }));
-                        }
-                    } else if (msg.recipient_id === user.id) {
-                        // Message for different chat - update unread count
-                        setUnreadCounts(prev => ({
-                            ...prev,
-                            [msg.sender_id]: (prev[msg.sender_id] || 0) + 1
-                        }));
+
+                // If message is for currently selected chat, add it
+                if (selectedPartner && (
+                    (msg.sender_id === selectedPartner && msg.recipient_id === user.id) ||
+                    (msg.sender_id === user.id && msg.recipient_id === selectedPartner)
+                )) {
+                    setMessages(prev => {
+                        if (prev.some(m => m.id === msg.id)) return prev;
+                        return [...prev, msg];
+                    });
+                    if (msg.sender_id === selectedPartner) {
+                        setUnreadCounts(prev => ({ ...prev, [selectedPartner]: 0 }));
                     }
-                } else if (msg.type === 'error') {
-                    console.error('WebSocket error:', msg.message);
+                } else if (msg.recipient_id === user.id) {
+                    // Message for different chat - update unread count
+                    setUnreadCounts(prev => ({
+                        ...prev,
+                        [msg.sender_id]: (prev[msg.sender_id] || 0) + 1
+                    }));
                 }
             } catch (e) {
                 console.error('WS Parse Error', e);

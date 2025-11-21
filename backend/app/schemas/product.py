@@ -8,6 +8,7 @@ class ProductCreate(BaseModel):
     stock_quantity: int = Field(..., ge=0)
     min_order_qty: int = Field(default=1, ge=1)
     is_active: bool = True
+    image_url: str | None = None
 
 class ProductUpdate(BaseModel):
     name: str | None = None
@@ -15,6 +16,7 @@ class ProductUpdate(BaseModel):
     stock_quantity: int | None = Field(None, ge=0)
     min_order_qty: int | None = Field(None, ge=1)
     is_active: bool | None = None
+    image_url: str | None = None
 
 # Response Schemas
 class ProductResponse(BaseModel):
@@ -26,6 +28,7 @@ class ProductResponse(BaseModel):
     stock_quantity: int
     min_order_qty: int
     is_active: bool
+    image_url: str | None = None
 
     class Config:
         from_attributes = True

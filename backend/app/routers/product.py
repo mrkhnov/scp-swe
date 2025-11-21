@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -12,14 +12,29 @@ router = APIRouter(prefix="/products", tags=["Products"])
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def create_product(
-    product_data: ProductCreate,
+    name: str = Form(...),
+    sku: str = Form(...),
+    price: float = Form(...),
+    stock_quantity: int = Form(...),
+    min_order_qty: int = Form(1),
+    is_active: str | bool = Form("true"),
+    image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles([UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]))
 ):
     """
     Create a new product (Supplier Owner/Manager only).
     """
-    product = await ProductService.create_product(db, current_user, product_data)
+    is_active_bool = _parse_bool(is_active)
+    product_data = ProductCreate(
+        name=name,
+        sku=sku,
+        price=price,
+        stock_quantity=stock_quantity,
+        min_order_qty=min_order_qty,
+        is_active=is_active_bool
+    )
+    product = await ProductService.create_product(db, current_user, product_data, image)
     
     # Send real-time notification to company
     from app.services.chat_service import manager
@@ -35,14 +50,26 @@ async def create_product(
 @router.put("/{product_id}", response_model=ProductResponse)
 async def update_product(
     product_id: int,
-    product_data: ProductUpdate,
+    name: str | None = Form(None),
+    price: float | None = Form(None),
+    stock_quantity: int | None = Form(None),
+    min_order_qty: int | None = Form(None),
+    is_active: str | bool | None = Form(None),
+    image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles([UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]))
 ):
     """
     Update an existing product (Supplier Owner/Manager only).
     """
-    product = await ProductService.update_product(db, product_id, current_user, product_data)
+    product_data = ProductUpdate(
+        name=name,
+        price=price,
+        stock_quantity=stock_quantity,
+        min_order_qty=min_order_qty,
+        is_active=_parse_bool(is_active) if is_active is not None else None
+    )
+    product = await ProductService.update_product(db, product_id, current_user, product_data, image)
     
     # Send real-time notification to company
     from app.services.chat_service import manager
@@ -107,3 +134,10 @@ async def get_product(
     """
     product = await ProductService.get_product_by_id(db, product_id, current_user)
     return product
+
+
+def _parse_bool(value: str | bool) -> bool:
+    """Normalize boolean values coming from form submissions"""
+    if isinstance(value, bool):
+        return value
+    return value.lower() in {"true", "1", "yes", "on"}

@@ -1,9 +1,13 @@
 from typing import Dict
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
+import aiofiles
+import os
+import uuid
+from pathlib import Path
 
-from app.models.chat_message import ChatMessage
+from app.models.chat_message import ChatMessage, MessageType
 from app.models.user import User
 
 
@@ -60,13 +64,25 @@ class ChatService:
     """Service for handling chat operations"""
     
     @staticmethod
-    async def save_message(db: AsyncSession, sender_id: int, recipient_id: int, content: str, attachment_url: str = None) -> ChatMessage:
+    async def save_message(
+        db: AsyncSession, 
+        sender_id: int, 
+        recipient_id: int, 
+        content: str, 
+        message_type: MessageType = MessageType.TEXT,
+        attachment_url: str = None,
+        file_name: str = None,
+        file_size: int = None
+    ) -> ChatMessage:
         """Save a chat message to the database"""
         message = ChatMessage(
             sender_id=sender_id,
             recipient_id=recipient_id,
             content=content,
+            message_type=message_type,
             attachment_url=attachment_url,
+            file_name=file_name,
+            file_size=file_size,
             timestamp=datetime.utcnow()
         )
         db.add(message)
@@ -120,3 +136,55 @@ class ChatService:
         result = await db.execute(query)
         counts = {row.sender_id: row.count for row in result}
         return counts
+
+    @staticmethod
+    async def save_file(file: UploadFile, user_id: int) -> tuple[str, str, int]:
+        """Save uploaded file and return file_path, file_name, file_size"""
+        # Validate file type
+        allowed_types = {
+            'application/pdf': 'pdf',
+            'audio/mpeg': 'mp3',
+            'audio/wav': 'wav',
+            'audio/mp4': 'm4a',
+            'audio/x-m4a': 'm4a'
+        }
+        
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"File type {file.content_type} not supported. Allowed: PDF, MP3, WAV, M4A"
+            )
+        
+        # Create uploads directory if it doesn't exist
+        upload_dir = Path("uploads/chat")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        file_extension = allowed_types[file.content_type]
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        file_path = upload_dir / unique_filename
+        
+        # Save file
+        file_size = 0
+        async with aiofiles.open(file_path, 'wb') as f:
+            content = await file.read()
+            file_size = len(content)
+            await f.write(content)
+        
+        # Validate file size (10MB limit)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if file_size > max_size:
+            os.unlink(file_path)  # Delete the file
+            raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
+        
+        return str(file_path), file.filename, file_size
+
+    @staticmethod
+    def get_message_type_from_content_type(content_type: str) -> MessageType:
+        """Determine message type from file content type"""
+        if content_type == 'application/pdf':
+            return MessageType.PDF
+        elif content_type.startswith('audio/'):
+            return MessageType.AUDIO
+        else:
+            return MessageType.TEXT

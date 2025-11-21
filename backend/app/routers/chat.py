@@ -1,11 +1,15 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException, UploadFile, File, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt, JWTError
+import os
+from pathlib import Path
 
 from app.db.session import get_db
 from app.core.config import get_settings
 from app.core.security import get_current_active_user
 from app.models.user import User
+from app.models.chat_message import MessageType
 from app.schemas.chat_message import ChatMessageResponse
 from app.services.chat_service import ChatService, manager
 from sqlalchemy import select
@@ -74,6 +78,9 @@ async def websocket_endpoint(
                 recipient_id = data.get("recipient_id")
                 content = data.get("content")
                 attachment_url = data.get("attachment_url")
+                message_type = data.get("message_type", "TEXT")
+                file_name = data.get("file_name")
+                file_size = data.get("file_size")
                 
                 if not recipient_id or not content:
                     await websocket.send_json({
@@ -91,9 +98,15 @@ async def websocket_endpoint(
                     })
                     continue
                 
+                # Parse message type
+                try:
+                    msg_type = MessageType(message_type)
+                except ValueError:
+                    msg_type = MessageType.TEXT
+                
                 # Save message to database
                 message = await ChatService.save_message(
-                    db, user.id, recipient_id, content, attachment_url
+                    db, user.id, recipient_id, content, msg_type, attachment_url, file_name, file_size
                 )
                 
                 # Prepare message payload
@@ -103,7 +116,10 @@ async def websocket_endpoint(
                     "sender_id": message.sender_id,
                     "recipient_id": message.recipient_id,
                     "content": message.content,
+                    "message_type": message.message_type.value,
                     "attachment_url": message.attachment_url,
+                    "file_name": message.file_name,
+                    "file_size": message.file_size,
                     "timestamp": message.timestamp.isoformat()
                 }
                 
@@ -159,3 +175,129 @@ async def get_unread_counts(
     """
     counts = await ChatService.get_unread_counts(db, current_user.id)
     return counts
+
+
+@router.post("/upload-file")
+async def upload_chat_file(
+    file: UploadFile = File(...),
+    recipient_id: int = Query(...),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Upload a file (PDF or audio) and send as chat message.
+    """
+    # Verify recipient exists
+    recipient = await db.get(User, recipient_id)
+    if not recipient:
+        raise HTTPException(status_code=404, detail="Recipient not found")
+    
+    try:
+        # Save the file
+        file_path, original_filename, file_size = await ChatService.save_file(file, current_user.id)
+        
+        # Determine message type
+        message_type = ChatService.get_message_type_from_content_type(file.content_type)
+        
+        # Create file URL (relative path for serving)
+        file_url = f"/chat/files/{Path(file_path).name}"
+        
+        # Create content message based on file type
+        if message_type == MessageType.PDF:
+            content = f"📄 {original_filename}"
+        elif message_type == MessageType.AUDIO:
+            content = f"🎵 {original_filename}"
+        else:
+            content = f"📎 {original_filename}"
+        
+        # Save message to database
+        message = await ChatService.save_message(
+            db=db,
+            sender_id=current_user.id,
+            recipient_id=recipient_id,
+            content=content,
+            message_type=message_type,
+            attachment_url=file_url,
+            file_name=original_filename,
+            file_size=file_size
+        )
+        
+        # Prepare message for WebSocket broadcast
+        message_data = {
+            "type": "message",
+            "id": message.id,
+            "sender_id": message.sender_id,
+            "recipient_id": message.recipient_id,
+            "content": message.content,
+            "message_type": message.message_type.value,
+            "attachment_url": message.attachment_url,
+            "file_name": message.file_name,
+            "file_size": message.file_size,
+            "timestamp": message.timestamp.isoformat()
+        }
+        
+        # Send to recipient if online via WebSocket
+        await manager.send_personal_message(message_data, recipient_id)
+        
+        # Also send to sender (echo back) so they see their own message
+        await manager.send_personal_message({
+            **message_data,
+            "type": "sent"
+        }, current_user.id)
+        
+        return {
+            "message": "File uploaded successfully",
+            "data": message_data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
+
+
+@router.get("/files/{filename}")
+async def serve_chat_file(
+    filename: str,
+    token: str = Query(..., description="JWT token for authentication"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Serve uploaded chat files with token-based authentication.
+    URL format: /chat/files/{filename}?token=JWT_TOKEN
+    """
+    try:
+        # Authenticate user from token
+        user = await get_user_from_token(token, db)
+        
+        file_path = Path("uploads/chat") / filename
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Additional security: verify user has access to this file
+        # (For now, any authenticated user can access any chat file)
+        # In production, you might want to verify the user is part of the conversation
+        
+        # Determine media type
+        if filename.endswith('.pdf'):
+            media_type = "application/pdf"
+        elif filename.endswith('.mp3'):
+            media_type = "audio/mpeg"
+        elif filename.endswith('.wav'):
+            media_type = "audio/wav"
+        elif filename.endswith('.m4a'):
+            media_type = "audio/mp4"
+        else:
+            media_type = "application/octet-stream"
+        
+        return FileResponse(
+            path=str(file_path),
+            media_type=media_type,
+            filename=filename
+        )
+        
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")

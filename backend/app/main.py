@@ -1,8 +1,14 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
 
 from app.routers import auth, link, order, product, complaint, chat
+from app.routers.connection import router as connection_router
 from app.core.config import get_settings
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+UPLOADS_DIR = BASE_DIR / "uploads"
 
 settings = get_settings()
 
@@ -28,6 +34,11 @@ app.include_router(order)
 app.include_router(product)
 app.include_router(complaint)
 app.include_router(chat)
+app.include_router(connection_router)
+
+# Static file mounting for uploaded assets
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 
 @app.get("/")

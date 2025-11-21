@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from app.models.link import Link, LinkStatus
 from app.models.company import Company, CompanyType
 from app.models.user import User, UserRole
+from app.models.blacklist import CompanyBlacklist
 from app.schemas.link import LinkCreate, LinkStatusUpdate
 
 
@@ -23,6 +24,21 @@ class LinkService:
             raise HTTPException(status_code=404, detail="Supplier company not found")
         if supplier_company.type != CompanyType.SUPPLIER:
             raise HTTPException(status_code=400, detail="Target company is not a Supplier")
+
+        # Check if consumer is blacklisted by this supplier
+        blacklist_check = await db.execute(
+            select(CompanyBlacklist).where(
+                and_(
+                    CompanyBlacklist.supplier_id == link_data.supplier_id,
+                    CompanyBlacklist.consumer_id == consumer.company_id
+                )
+            )
+        )
+        if blacklist_check.scalar_one_or_none():
+            raise HTTPException(
+                status_code=403, 
+                detail="Your company has been blocked by this supplier and cannot request links"
+            )
 
         # Check if link already exists
         existing_link = await db.execute(

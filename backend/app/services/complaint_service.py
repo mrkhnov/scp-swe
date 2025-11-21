@@ -1,11 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
 from app.models.complaint import Complaint, ComplaintStatus
 from app.models.order import Order
 from app.models.user import User, UserRole
+from app.models.blacklist import CompanyBlacklist
 from app.schemas.complaint import ComplaintCreate, ComplaintEscalate
 
 
@@ -21,6 +22,19 @@ class ComplaintService:
         # Verify user has access to this order
         if user.company_id not in [order.consumer_id, order.supplier_id]:
             raise HTTPException(status_code=403, detail="You cannot create a complaint for this order")
+        
+        # Check if consumer is blacklisted (but still allow complaint creation)
+        if user.role == UserRole.CONSUMER and order.consumer_id == user.company_id:
+            blacklist_query = select(CompanyBlacklist).where(
+                and_(
+                    CompanyBlacklist.supplier_id == order.supplier_id,
+                    CompanyBlacklist.consumer_id == order.consumer_id
+                )
+            )
+            blacklist_result = await db.execute(blacklist_query)
+            if blacklist_result.scalar_one_or_none():
+                # Consumer is blacklisted but can still create complaints
+                pass
 
         new_complaint = Complaint(
             order_id=complaint_data.order_id,
@@ -103,6 +117,9 @@ class ComplaintService:
                 raise HTTPException(status_code=403, detail="Not your complaint")
             if complaint.status != ComplaintStatus.RESOLVED:
                 raise HTTPException(status_code=400, detail="You can only escalate resolved complaints if not satisfied")
+            
+            # Blocked consumers can still escalate complaints - this is their right
+            # No need to check blacklist status for complaint escalation
         elif user.role == UserRole.SUPPLIER_SALES:
             if order.supplier_id != user.company_id:
                 raise HTTPException(status_code=403, detail="Not your company's complaint")

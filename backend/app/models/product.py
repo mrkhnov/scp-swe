@@ -13,6 +13,7 @@ class Product(Base):
     stock_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     min_order_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     supplier: Mapped["Company"] = relationship(back_populates="products")
     order_items: Mapped[list["OrderItem"]] = relationship(back_populates="product")

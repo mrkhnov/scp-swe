@@ -180,10 +180,10 @@ async def get_company_settings(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get current user's company settings (Owner only).
+    Get current user's company settings (Owner and Manager).
     """
-    if current_user.role != UserRole.SUPPLIER_OWNER:
-        raise HTTPException(status_code=403, detail="Only Supplier Owners can view company settings")
+    if current_user.role not in [UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]:
+        raise HTTPException(status_code=403, detail="Only Supplier Owners and Managers can view company settings")
     
     if not current_user.company_id:
         raise HTTPException(status_code=400, detail="User has no associated company")

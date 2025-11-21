@@ -7,6 +7,7 @@ from app.models.product import Product
 from app.models.company import Company, CompanyType
 from app.models.user import User, UserRole
 from app.models.link import Link, LinkStatus
+from app.models.blacklist import CompanyBlacklist
 from app.schemas.order import OrderCreate, OrderStatusUpdate
 
 
@@ -39,6 +40,21 @@ class OrderService:
             raise HTTPException(
                 status_code=403,
                 detail="You do not have an approved link with this supplier"
+            )
+
+        # Check if consumer is blacklisted by supplier
+        blacklist_result = await db.execute(
+            select(CompanyBlacklist).where(
+                and_(
+                    CompanyBlacklist.supplier_id == order_data.supplier_id,
+                    CompanyBlacklist.consumer_id == consumer.company_id
+                )
+            )
+        )
+        if blacklist_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=403,
+                detail="You are blocked from placing orders with this supplier"
             )
 
         # Verify all products belong to the supplier and are available
