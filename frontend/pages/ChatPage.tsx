@@ -77,9 +77,11 @@ export default function ChatPage() {
     const [isConnected, setIsConnected] = useState(false);
     const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({});
     const [complaintId, setComplaintId] = useState<number | null>(null);
+    const [uploading, setUploading] = useState(false);
     
     const wsRef = useRef<any>(null); 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Handle navigation state (from complaint "Reply in Chat" button)
     useEffect(() => {
@@ -119,24 +121,36 @@ export default function ChatPage() {
                     return;
                 }
                 
-                // If message is for currently selected chat, add it
-                if (selectedPartner && (
-                    (msg.sender_id === selectedPartner && msg.recipient_id === user.id) ||
-                    (msg.sender_id === user.id && msg.recipient_id === selectedPartner)
-                )) {
-                    setMessages(prev => {
-                        if (prev.some(m => m.id === msg.id)) return prev;
-                        return [...prev, msg];
-                    });
-                    if (msg.sender_id === selectedPartner) {
-                        setUnreadCounts(prev => ({ ...prev, [selectedPartner]: 0 }));
+                // Handle real-time updates for complaints and orders
+                if (msg.type === 'complaint_update' || msg.type === 'order_update') {
+                    // Dispatch custom event for dashboards to listen to
+                    window.dispatchEvent(new CustomEvent(msg.type, { detail: msg }));
+                    return;
+                }
+                
+                // Handle both "message" and "sent" types (sent is echo back to sender)
+                if (msg.type === 'message' || msg.type === 'sent') {
+                    // If message is for currently selected chat, add it
+                    if (selectedPartner && (
+                        (msg.sender_id === selectedPartner && msg.recipient_id === user.id) ||
+                        (msg.sender_id === user.id && msg.recipient_id === selectedPartner)
+                    )) {
+                        setMessages(prev => {
+                            if (prev.some(m => m.id === msg.id)) return prev;
+                            return [...prev, msg];
+                        });
+                        if (msg.sender_id === selectedPartner) {
+                            setUnreadCounts(prev => ({ ...prev, [selectedPartner]: 0 }));
+                        }
+                    } else if (msg.recipient_id === user.id) {
+                        // Message for different chat - update unread count
+                        setUnreadCounts(prev => ({
+                            ...prev,
+                            [msg.sender_id]: (prev[msg.sender_id] || 0) + 1
+                        }));
                     }
-                } else if (msg.recipient_id === user.id) {
-                    // Message for different chat - update unread count
-                    setUnreadCounts(prev => ({
-                        ...prev,
-                        [msg.sender_id]: (prev[msg.sender_id] || 0) + 1
-                    }));
+                } else if (msg.type === 'error') {
+                    console.error('WebSocket error:', msg.message);
                 }
             } catch (e) {
                 console.error('WS Parse Error', e);
@@ -193,6 +207,123 @@ export default function ChatPage() {
         const payload = { recipient_id: selectedPartner, content: input, attachment_url: null };
         wsRef.current.send(JSON.stringify(payload));
         setInput('');
+    };
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !selectedPartner) return;
+
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Only PDF and audio files (MP3, WAV, M4A) are supported');
+            return;
+        }
+
+        // Validate file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+            alert('File size must be less than 10MB');
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch(`http://localhost:8000/chat/upload-file?recipient_id=${selectedPartner}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Upload failed');
+            }
+
+            const result = await response.json();
+            console.log('File uploaded successfully:', result);
+
+            // Immediately add the message to the chat for better UX
+            // (it will also come via WebSocket but this is faster)
+            if (result.data) {
+                setMessages(prev => {
+                    if (prev.some(m => m.id === result.data.id)) return prev;
+                    return [...prev, result.data];
+                });
+            }
+
+            // Message will also be added via WebSocket when it arrives
+        } catch (error: any) {
+            console.error('File upload error:', error);
+            alert(`Upload failed: ${error.message}`);
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const openFileDialog = () => {
+        fileInputRef.current?.click();
+    };
+
+    const renderMessageContent = (msg: ChatMessage) => {
+        const token = getAccessToken();
+        
+        switch (msg.message_type) {
+            case 'PDF':
+                return (
+                    <div className="flex items-center gap-2">
+                        <span className="text-2xl">📄</span>
+                        <div className="flex-1 min-w-0">
+                            <div className="font-medium">{msg.file_name}</div>
+                            {msg.file_size && (
+                                <div className="text-xs opacity-70">
+                                    {(msg.file_size / 1024 / 1024).toFixed(1)} MB
+                                </div>
+                            )}
+                        </div>
+                        {msg.attachment_url && (
+                            <a 
+                                href={`http://localhost:8000${msg.attachment_url}?token=${token}`} 
+                                download={msg.file_name}
+                                className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30"
+                            >
+                                Download
+                            </a>
+                        )}
+                    </div>
+                );
+            case 'AUDIO':
+                return (
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl">🎵</span>
+                            <div className="flex-1 min-w-0">
+                                <div className="font-medium">{msg.file_name}</div>
+                                {msg.file_size && (
+                                    <div className="text-xs opacity-70">
+                                        {(msg.file_size / 1024 / 1024).toFixed(1)} MB
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        {msg.attachment_url && (
+                            <audio controls className="w-full max-w-xs">
+                                <source src={`http://localhost:8000${msg.attachment_url}?token=${token}`} />
+                                Your browser does not support the audio element.
+                            </audio>
+                        )}
+                    </div>
+                );
+            default:
+                return msg.content;
+        }
     };
 
     return (
@@ -275,7 +406,7 @@ export default function ChatPage() {
                                             ? 'bg-system-blue text-white rounded-br-sm' 
                                             : 'bg-[#e9e9eb] text-black rounded-bl-sm'
                                         }`}>
-                                            {msg.content}
+                                            {renderMessageContent(msg)}
                                         </div>
                                     </div>
                                 );
@@ -286,6 +417,20 @@ export default function ChatPage() {
                         {/* Input Area */}
                         <div className="p-4 bg-white border-t border-system-border">
                             <div className="flex gap-3 items-center">
+                                <button
+                                    onClick={openFileDialog}
+                                    disabled={uploading || !isConnected}
+                                    className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                                    title="Upload PDF or audio file"
+                                >
+                                    {uploading ? (
+                                        <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current text-gray-600">
+                                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                                        </svg>
+                                    )}
+                                </button>
                                 <input 
                                     type="text" 
                                     className="flex-grow px-4 py-2 bg-white border border-system-border rounded-full focus:ring-2 focus:ring-system-blue focus:border-transparent outline-none transition-shadow placeholder-gray-400"
@@ -293,15 +438,24 @@ export default function ChatPage() {
                                     value={input}
                                     onChange={e => setInput(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                                    disabled={uploading}
                                 />
                                 <button 
                                     onClick={sendMessage}
-                                    disabled={!input.trim() || !isConnected}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${input.trim() ? 'bg-system-blue text-white' : 'bg-gray-200 text-gray-400'}`}
+                                    disabled={!input.trim() || !isConnected || uploading}
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${input.trim() && !uploading ? 'bg-system-blue text-white' : 'bg-gray-200 text-gray-400'}`}
                                 >
                                     <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
                                 </button>
                             </div>
+                            {/* Hidden file input */}
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileUpload}
+                                accept=".pdf,.mp3,.wav,.m4a,audio/*"
+                                style={{ display: 'none' }}
+                            />
                         </div>
                     </>
                 )}

@@ -1,7 +1,7 @@
 import { User, UserRole, Link, Product, Order, Complaint, ChatMessage, CompanyType } from '../types';
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = 'http://localhost:8000';
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
@@ -76,6 +76,12 @@ function decodeJWTPayload(token: string): any {
   }
 }
 
+export function resolveImageUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('http')) return url;
+  return `${API_BASE_URL}${url}`;
+}
+
 function getUserFromToken(): User | null {
   const token = getAccessToken();
   if (!token) return null;
@@ -112,11 +118,16 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+  const defaultHeaders: HeadersInit = { ...getHeaders() };
+
+  if (options.body instanceof FormData) {
+    delete (defaultHeaders as Record<string, string>)['Content-Type'];
+  }
+
   const response = await fetch(url, {
     ...options,
     headers: {
-      ...getHeaders(),
+      ...defaultHeaders,
       ...options.headers,
     },
   });
@@ -234,17 +245,53 @@ export const products = {
     return apiRequest<Product[]>(`/products/catalog${query}`);
   },
 
-  async createProduct(productData: Omit<Product, 'id' | 'supplier_id'>): Promise<Product> {
+  async createProduct(productData: {
+    name: string;
+    sku: string;
+    price: number;
+    stock_quantity: number;
+    min_order_qty?: number;
+    is_active?: boolean;
+    image?: File | null;
+  }): Promise<Product> {
+    const formData = new FormData();
+    formData.append('name', productData.name);
+    formData.append('sku', productData.sku);
+    formData.append('price', productData.price.toString());
+    formData.append('stock_quantity', productData.stock_quantity.toString());
+    formData.append('min_order_qty', (productData.min_order_qty ?? 1).toString());
+    formData.append('is_active', String(productData.is_active ?? true));
+
+    if (productData.image) {
+      formData.append('image', productData.image);
+    }
+
     return apiRequest<Product>('/products/', {
       method: 'POST',
-      body: JSON.stringify(productData),
+      body: formData,
     });
   },
 
-  async updateProduct(productId: number, productData: Partial<Product>): Promise<Product> {
+  async updateProduct(productId: number, productData: {
+    name?: string;
+    price?: number;
+    stock_quantity?: number;
+    min_order_qty?: number;
+    is_active?: boolean;
+    image?: File | null;
+  }): Promise<Product> {
+    const formData = new FormData();
+
+    if (productData.name !== undefined) formData.append('name', productData.name);
+    if (productData.price !== undefined) formData.append('price', productData.price.toString());
+    if (productData.stock_quantity !== undefined) formData.append('stock_quantity', productData.stock_quantity.toString());
+    if (productData.min_order_qty !== undefined) formData.append('min_order_qty', productData.min_order_qty.toString());
+    if (productData.is_active !== undefined) formData.append('is_active', String(productData.is_active));
+    if (productData.image) formData.append('image', productData.image);
+
     return apiRequest<Product>(`/products/${productId}`, {
       method: 'PUT',
-      body: JSON.stringify(productData),
+      body: formData,
     });
   },
 
@@ -343,6 +390,36 @@ export const chat = {
   },
 };
 
+// Connection Management API
+export const connections = {
+  async getConnections(): Promise<any[]> {
+    return apiRequest<any[]>('/connections/');
+  },
+
+  async getBlacklist(): Promise<any[]> {
+    return apiRequest<any[]>('/connections/blacklist');
+  },
+
+  async blockConsumer(consumerId: number, reason?: string): Promise<any> {
+    return apiRequest<any>('/connections/block', {
+      method: 'POST',
+      body: JSON.stringify({ consumer_id: consumerId, reason }),
+    });
+  },
+
+  async unblockConsumer(consumerId: number): Promise<any> {
+    return apiRequest<any>(`/connections/unblock/${consumerId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async removeConnection(consumerId: number): Promise<any> {
+    return apiRequest<any>(`/connections/remove/${consumerId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Main API export (for backward compatibility)
 export const api = {
   // Auth
@@ -378,6 +455,13 @@ export const api = {
   getChatHistory: chat.getChatHistory,
   sendMessage: chat.sendMessage,
   getUnreadCounts: chat.getUnreadCounts,
+  
+  // Connection Management
+  getConnections: connections.getConnections,
+  getBlacklist: connections.getBlacklist,
+  blockConsumer: connections.blockConsumer,
+  unblockConsumer: connections.unblockConsumer,
+  removeConnection: connections.removeConnection,
   
   // File upload (stub - not implemented in backend)
   async uploadFile(file: File): Promise<string> {

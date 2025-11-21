@@ -95,7 +95,10 @@ export interface ChatMessage {
   sender_id: number;
   recipient_id: number;
   content: string;
+  message_type: string; // 'TEXT', 'PDF', 'AUDIO', 'IMAGE'
   attachment_url?: string;
+  file_name?: string;
+  file_size?: number;
   timestamp: string;
 }
 
@@ -113,4 +116,24 @@ export interface Complaint {
 
 export interface CartItem extends Product {
   quantity: number;
+}
+
+export interface Connection {
+  id: number;
+  supplier_id: number;
+  consumer_id: number;
+  status: string;
+  consumer_name: string;
+  is_blacklisted: boolean;
+}
+
+export interface BlacklistEntry {
+  id: number;
+  supplier_id: number;
+  consumer_id: number;
+  blocked_at: string;
+  blocked_by: number | null;
+  reason: string | null;
+  consumer_name: string;
+  blocker_email: string | null;
 }

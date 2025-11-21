@@ -55,6 +55,7 @@ export default function Login() {
         const user = getUserFromToken();
         setUser(user);
         if (user?.role === UserRole.CONSUMER) navigate('/consumer');
+        else if (user?.role === UserRole.SUPPLIER_SALES) navigate('/sales');
         else navigate('/supplier');
       }
     } catch (err: any) {

@@ -87,9 +87,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <>
                     <button 
                       onClick={() => navigate('/sales')} 
-                      className={`transition-colors hover:text-system-text ${isActive('/sales') ? 'text-system-text' : ''}`}
+                      className={`transition-colors hover:text-system-text ${isActive('/sales') && !isActive('/sales/orders') && !isActive('/sales/complaints') ? 'text-system-text' : ''}`}
                     >
-                      Overview
+                      Dashboard
                     </button>
                     <button 
                       onClick={() => navigate('/sales/orders')} 
@@ -104,50 +104,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       Complaints
                     </button>
                   </>
-                ) : (
-                  <>                                        
-                    <button 
-                      onClick={() => navigate('/supplier')} 
-                      className={`transition-colors hover:text-system-text ${isActive('/supplier') ? 'text-system-text' : ''}`}
-                    >
-                      Overview
-                    </button>
-                    <button 
-                      onClick={() => navigate('/supplier/products')} 
-                      className={`transition-colors hover:text-system-text ${isActive('/supplier/products') ? 'text-system-text' : ''}`}
-                    >
-                      Catalog
-                    </button>
-                    <button 
-                      onClick={() => navigate('/supplier/orders')} 
-                      className={`transition-colors hover:text-system-text ${isActive('/supplier/orders') ? 'text-system-text' : ''}`}
-                    >
-                      Orders
-                    </button>
-                    <button 
-                      onClick={() => navigate('/supplier/complaints')} 
-                      className={`transition-colors hover:text-system-text ${isActive('/supplier/complaints') ? 'text-system-text' : ''}`}
-                    >
-                      Complaints
-                    </button>
-                    {user.role === UserRole.SUPPLIER_OWNER && (
-                      <>
-                        <button 
-                          onClick={() => navigate('/supplier/team')} 
-                          className={`transition-colors hover:text-system-text ${isActive('/supplier/team') ? 'text-system-text' : ''}`}
-                        >
-                          Team
-                        </button>
-                        <button 
-                          onClick={() => navigate('/supplier/settings')} 
-                          className={`transition-colors hover:text-system-text ${isActive('/supplier/settings') ? 'text-system-text' : ''}`}
-                        >
-                          Settings
-                        </button>
-                      </>
-                    )}
-                  </>
-                )}
+                ) : (user.role === UserRole.SUPPLIER_OWNER || user.role === UserRole.SUPPLIER_MANAGER) ? (
+                  // Supplier routes handled by SupplierDashboard component - no nav needed here
+                  null
+                ) : null}
                 {/* Only show Messages for Consumer and Sales Rep */}
                 {(user.role === UserRole.CONSUMER || user.role === UserRole.SUPPLIER_SALES) && (
                   <button 
@@ -195,7 +155,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 // --- Protected Route Wrapper ---
-const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: UserRole[] }> = ({ children, allowedRoles }) => {
+const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: UserRole[]; noLayout?: boolean }> = ({ children, allowedRoles, noLayout = false }) => {
   const { user } = useApp();
   
   if (!user) return <Navigate to="/login" replace />;
@@ -213,7 +173,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: UserR
     );
   }
 
-  return <Layout>{children}</Layout>;
+  return noLayout ? <>{children}</> : <Layout>{children}</Layout>;
 };
 
 export default function App() {
@@ -276,7 +236,7 @@ export default function App() {
 
           {/* Supplier Routes (Owner & Manager) */}
           <Route path="/supplier/*" element={
-            <ProtectedRoute allowedRoles={[UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]}>
+            <ProtectedRoute allowedRoles={[UserRole.SUPPLIER_OWNER, UserRole.SUPPLIER_MANAGER]} noLayout={true}>
               <SupplierDashboard />
             </ProtectedRoute>
           } />

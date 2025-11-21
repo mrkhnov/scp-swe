@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { api } from '../../services/api';
+import { api, resolveImageUrl } from '../../services/api';
 import { Link, LinkStatus, Product, Order, Complaint, ComplaintStatus } from '../../types';
 import { useApp } from '../../App';
 
@@ -172,8 +172,8 @@ function ConsumerCatalog() {
                     {products.map(product => (
                         <div key={product.id} className="group bg-white rounded-3xl shadow-card border border-system-border/50 overflow-hidden hover:shadow-lg transition-all duration-300">
                             <div className="aspect-square bg-system-bg relative overflow-hidden">
-                                {product.image_url ? (
-                                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                {resolveImageUrl(product.image_url) ? (
+                                    <img src={resolveImageUrl(product.image_url)} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300">📦</div>
                                 )}
@@ -215,7 +215,7 @@ function ConsumerCatalog() {
                             <div key={idx} className="flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-system-bg rounded-lg flex items-center justify-center text-sm shrink-0 overflow-hidden">
-                                    {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover"/> : '📦'}
+                                    {resolveImageUrl(item.image_url) ? <img src={resolveImageUrl(item.image_url)} className="w-full h-full object-cover"/> : '📦'}
                                 </div>
                                 <div>
                                     <div className="font-medium text-sm text-system-text">{item.name}</div>
