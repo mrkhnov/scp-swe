@@ -1,587 +1,591 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Alert, Platform, KeyboardAvoidingView, TextInput } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  GiftedChat
-} from 'react-native-gifted-chat';
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  FlatList,
+  Alert,
+  Platform,
+  StatusBar,
+  KeyboardAvoidingView,
+  TextInput,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { useWebSocket } from '../context/WebSocketContext';
 import api from '../services/api';
 import { COLORS } from '../constants/colors';
 
+// Constants
+const PRIMARY_COLOR = COLORS.primary || '#007AFF';
+const BG_COLOR = '#f8f9fa';
+
 export default function ChatScreen() {
-  const { user, loading: authLoading } = useAuth();
-  const { isConnected: wsConnected, sendMessage: wsSendMessage, addMessageHandler } = useWebSocket();
+  const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+
+  // State
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingText, setTypingText] = useState('');
+  const [isConnected, setIsConnected] = useState(false);
+  const [inputText, setInputText] = useState('');
 
-  // Use refs to avoid dependency issues
+  // Refs
+  const wsRef = useRef(null);
   const selectedConversationRef = useRef(null);
-  const isLoadingConversationsRef = useRef(false);
-  const typingTimeoutRef = useRef(null);
 
-  // Update refs when values change
+  // Keep ref in sync with state for WebSocket callbacks
   useEffect(() => {
     selectedConversationRef.current = selectedConversation;
   }, [selectedConversation]);
 
+  // 1. Load Conversations
   const loadConversations = useCallback(async () => {
-    if (isLoadingConversationsRef.current) {
-      console.log('Already loading conversations, skipping...');
-      return;
-    }
-
     try {
-      console.log('Loading conversations...');
-      isLoadingConversationsRef.current = true;
+      setLoading(true);
       const data = await api.getConversations();
-      console.log('Conversations loaded:', data?.length || 0);
       setConversations(data || []);
     } catch (error) {
       console.error('Failed to load conversations:', error);
-      Alert.alert('Error', 'Failed to load conversations');
     } finally {
       setLoading(false);
-      isLoadingConversationsRef.current = false;
     }
   }, []);
 
-  // Load conversations on mount
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
 
-  // Register WebSocket message handler
+  // 2. WebSocket Connection
   useEffect(() => {
-    if (!user) return;
+    if (!user || !api.accessToken) return;
 
-    const handleMessage = (data) => {
-      // Handle typing indicators
-      if (data.type === 'typing') {
-        const currentConversation = selectedConversationRef.current;
-        if (currentConversation && data.sender_id === currentConversation.id) {
-          setIsTyping(data.isTyping);
-          if (data.isTyping) {
-            setTypingText(`${currentConversation.name} is typing...`);
-          } else {
-            setTypingText('');
-          }
+    const connectWebSocket = () => {
+      const apiUrl = api.getApiUrl();
+      // Handle both http/https to ws/wss conversion
+      const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
+      const wsBaseUrl = apiUrl.replace(/^https?:\/\//, '');
+      const wsUrl = `${wsProtocol}://${wsBaseUrl}/chat/ws?token=${api.accessToken}`;
+
+      console.log('Connecting to WebSocket:', wsUrl);
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        setIsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleWebSocketMessage(data);
+        } catch (e) {
+          console.error('Error parsing WS message:', e);
         }
-        return;
-      }
+      };
 
-      // Only handle messages if we're in the correct conversation
-      const currentConversation = selectedConversationRef.current;
-      const isRelevantMessage = currentConversation && (
-        (data.sender_id === currentConversation.id && data.recipient_id === user.id) ||
-        (data.sender_id === user.id && data.recipient_id === currentConversation.id)
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        setIsConnected(false);
+      };
+
+      ws.onerror = (e) => {
+        console.error('WebSocket error:', e);
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [user]);
+
+  // 3. Handle Incoming Messages
+  const handleWebSocketMessage = (data) => {
+    if (data.type === 'message' || data.type === 'sent') {
+      const currentConv = selectedConversationRef.current;
+
+      // Check if message belongs to current conversation
+      const isRelevant = currentConv && (
+        (data.sender_id === currentConv.id) ||
+        (data.recipient_id === currentConv.id)
       );
 
-      if (data.type === 'message' && isRelevantMessage) {
+      if (isRelevant) {
         const newMessage = {
-          _id: data.id ? data.id.toString() : Math.random().toString(),
+          _id: data.id,
           text: data.content,
           createdAt: new Date(data.timestamp),
           user: {
             _id: data.sender_id,
-            name: data.sender_id === user.id ? user.email : currentConversation.name,
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              data.sender_id === user.id ? user.email : currentConversation.name
-            )}&background=${data.sender_id === user.id ? '0084ff' : '666666'}&color=fff&size=40`,
+            name: data.sender_id === user.id ? 'Me' : currentConv.name,
           },
-          sent: true,
-          received: data.sender_id !== user.id,
-          pending: false,
         };
 
-        // Only add if message doesn't already exist
         setMessages(previousMessages => {
-          const messageExists = previousMessages.some(msg => msg._id === newMessage._id);
-          if (messageExists) {
+          if (previousMessages.some(m => m._id === newMessage._id)) {
             return previousMessages;
           }
-          return GiftedChat.append(previousMessages, [newMessage]);
+          return [newMessage, ...previousMessages];
         });
       }
-    };
 
-    // Register the handler and get cleanup function
-    const cleanup = addMessageHandler(handleMessage);
-
-    return cleanup;
-  }, [user, addMessageHandler]);
-
-  // Load messages when conversation changes
-  useEffect(() => {
-    if (selectedConversation && user?.id) {
-      loadMessages(selectedConversation.id, selectedConversation.name);
-    } else if (!selectedConversation) {
-      setMessages([]);
-      setLoadingMessages(false);
+      // Refresh list for unread counts
+      loadConversations();
     }
-  }, [selectedConversation?.id, user?.id]);
+  };
 
-  // Define loadMessages function separately to avoid dependency issues
-  const loadMessages = useCallback(async (userId, conversationName) => {
-    console.log('Loading messages for user:', userId);
-    setLoadingMessages(true);
-    setMessages([]); // Clear messages immediately
-
+  // 4. Load Chat History
+  const loadMessages = async (partnerId) => {
+    setMessages([]);
     try {
-      const data = await api.getMessages(userId);
-      console.log('Messages loaded:', data?.length || 0);
-
-      const formattedMessages = (data || []).map(msg => ({
-        _id: msg.id.toString(), // Ensure _id is always a string
+      const history = await api.getMessages(partnerId);
+      const formattedMessages = history.map(msg => ({
+        _id: msg.id,
         text: msg.content,
         createdAt: new Date(msg.timestamp),
         user: {
           _id: msg.sender_id,
-          name: msg.sender_id === user.id ? user.email : conversationName,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            msg.sender_id === user.id ? user.email : conversationName
-          )}&background=${msg.sender_id === user.id ? '0084ff' : '666666'}&color=fff&size=40`,
+          name: msg.sender_id === user.id ? 'Me' : 'Partner',
         },
-        sent: true,
-        received: msg.sender_id !== user.id,
-        pending: false,
       }));
-
-      // Sort messages by createdAt (newest first, which is what GiftedChat expects)
-      formattedMessages.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-      setMessages(formattedMessages);
+      setMessages(formattedMessages.reverse());
     } catch (error) {
-      console.error('Failed to load messages:', error);
-      Alert.alert('Error', 'Failed to load messages');
-    } finally {
-      setLoadingMessages(false);
+      console.error('Failed to load history:', error);
     }
-  }, [user?.id, user?.email]);
+  };
 
-  const insets = useSafeAreaInsets();
+  // 5. Select Conversation
+  const handleSelectConversation = (conv) => {
+    setSelectedConversation(conv);
+    loadMessages(conv.id);
+  };
 
-  const onSend = useCallback(async (newMessages = []) => {
-    const message = newMessages[0];
-    if (!message?.text?.trim() || !selectedConversation) {
+  // 6. Send Message
+  const handleSend = () => {
+    if (!inputText.trim()) return;
+    
+    if (!wsRef.current || !isConnected) {
+      Alert.alert('Offline', 'Chat server not connected');
       return;
     }
 
-    // Ensure WebSocket is connected
-    if (!wsConnected) {
-      Alert.alert('Connection Error', 'WebSocket is not connected. Please wait a moment and try again.');
-      return;
-    }
-
-    // Create message with unique temp ID
-    const tempId = `temp_${Date.now()}_${Math.random()}`;
-    const messageWithId = {
-      ...message,
-      _id: tempId,
-      pending: true,
-      sent: false,
-      received: false,
-      user: chatUser,
+    const payload = {
+      recipient_id: selectedConversation.id,
+      content: inputText.trim(),
     };
+    wsRef.current.send(JSON.stringify(payload));
+    setInputText('');
+  };
 
-    try {
-      // Add message to UI immediately (optimistic update)
-      setMessages(previousMessages => GiftedChat.append(previousMessages, [messageWithId]));
+  const renderConversationItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.conversationCard}
+      onPress={() => handleSelectConversation(item)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.avatarContainer, { backgroundColor: PRIMARY_COLOR + '20' }]}>
+        <Text style={[styles.avatarText, { color: PRIMARY_COLOR }]}>
+          {item.name ? item.name[0].toUpperCase() : '?'}
+        </Text>
+      </View>
 
-      // Send via WebSocket only
-      console.log('Sending message via WebSocket');
-      wsSendMessage(selectedConversation.id, message.text);
-
-      // Mark as sent immediately (we'll get confirmation via WebSocket)
-      setMessages(previousMessages =>
-        previousMessages.map(msg =>
-          msg._id === tempId
-            ? { ...msg, pending: false, sent: true }
-            : msg
-        )
-      );
-
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      Alert.alert('Error', 'Failed to send message');
-
-      // Remove the message from UI on error
-      setMessages(previousMessages =>
-        previousMessages.filter(msg => msg._id !== tempId)
-      );
-    }
-  }, [selectedConversation, chatUser, wsConnected, wsSendMessage]);
-
-  // Removed custom renderers to fix mobile input issues
-
-  // Memoize user object for GiftedChat to prevent re-renders
-  const chatUser = React.useMemo(() => ({
-    _id: user?.id,
-    name: user?.email,
-  }), [user?.id, user?.email]);
-
-  // Memoize textInputProps
-  const textInputProps = React.useMemo(() => ({
-    editable: true,
-    multiline: false,
-    returnKeyType: 'send',
-    blurOnSubmit: true,
-    enablesReturnKeyAutomatically: true,
-    style: styles.textInput,
-  }), []);
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Messages</Text>
-          </View>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>Loading conversations...</Text>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (selectedConversation) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => setSelectedConversation(null)}
-            >
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
-            <View style={styles.headerInfo}>
-              <Text style={styles.headerTitle}>{selectedConversation.name}</Text>
-              <Text style={styles.headerSubtitle}>
-                {wsConnected ? (selectedConversation.company_name || 'Online') : 'Connecting...'}
-              </Text>
-            </View>
-          </View>
-
-          {loadingMessages ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={styles.loadingText}>Loading messages...</Text>
-            </View>
-          ) : (
-            <KeyboardAvoidingView
-              style={{ flex: 1 }}
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 60 + insets.top : 0}
-            >
-              <GiftedChat
-                messages={messages}
-                onSend={onSend}
-                user={chatUser}
-                placeholder="Type a message..."
-                alwaysShowSend={true}
-                showUserAvatar={false}
-                showAvatarForEveryMessage={false}
-                textInputProps={textInputProps}
-                minInputToolbarHeight={50}
-                maxInputLength={1000}
-                keyboardShouldPersistTaps="never"
-                bottomOffset={insets.bottom}
-                renderAvatar={null}
-                isKeyboardInternallyHandled={false}
-                shouldUpdateMessage={() => true} // Changed to true to ensure updates
-                renderBubble={props => {
-                  return (
-                    <View style={{
-                      backgroundColor: props.currentMessage.user._id === user.id ? '#0084ff' : '#fff',
-                      borderRadius: 20,
-                      padding: 12,
-                      marginBottom: 4,
-                      maxWidth: '80%',
-                      alignSelf: props.currentMessage.user._id === user.id ? 'flex-end' : 'flex-start',
-                      marginLeft: props.currentMessage.user._id === user.id ? 0 : 10,
-                      marginRight: props.currentMessage.user._id === user.id ? 10 : 0,
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 2,
-                      elevation: 1,
-                    }}>
-                      <Text style={{
-                        color: props.currentMessage.user._id === user.id ? '#fff' : '#1a1a1a',
-                        fontSize: 16,
-                        lineHeight: 22,
-                      }}>
-                        {props.currentMessage.text}
-                      </Text>
-                    </View>
-                  );
-                }}
-                renderSend={props => (
-                  <TouchableOpacity
-                    onPress={() => props.onSend({ text: props.text }, true)}
-                    style={{
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      height: 50,
-                      width: 50,
-                      marginRight: 5,
-                    }}
-                  >
-                    <Text style={{ color: '#0084ff', fontWeight: 'bold', fontSize: 16 }}>Send</Text>
-                  </TouchableOpacity>
-                )}
-                renderInputToolbar={props => (
-                  <View style={{
-                    backgroundColor: '#fff',
-                    paddingTop: 6,
-                    paddingBottom: 6,
-                    borderTopWidth: 1,
-                    borderTopColor: '#f0f0f0',
-                  }}>
-                    {/* We don't use the default InputToolbar to have full control */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <TextInput
-                        {...props.textInputProps}
-                        style={[styles.textInput, { flex: 1, maxHeight: 100 }]}
-                        placeholder={props.placeholder}
-                        value={props.text}
-                        onChangeText={props.onTextChanged}
-                        multiline
-                      />
-                      {props.renderSend(props)}
-                    </View>
-                  </View>
-                )}
-              />
-            </KeyboardAvoidingView>
+      <View style={styles.cardContent}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+          {item.last_message_time && (
+            <Text style={styles.cardTime}>
+              {new Date(item.last_message_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
           )}
         </View>
+
+        <View style={styles.cardFooter}>
+          <Text style={styles.cardCompany} numberOfLines={1}>{item.company_name}</Text>
+          {item.unread_count > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>{item.unread_count}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      <Ionicons name="chevron-forward" size={20} color="#ccc" style={{ marginLeft: 8 }} />
+    </TouchableOpacity>
+  );
+
+  const renderMessageItem = ({ item }) => {
+    const isMe = item.user._id === user.id;
+    return (
+        <View style={[
+            styles.messageRow,
+            isMe ? styles.myMessageRow : styles.theirMessageRow
+        ]}>
+            <View style={[
+                styles.messageBubble,
+                isMe ? styles.myMessage : styles.theirMessage
+            ]}>
+                <Text style={[
+                    styles.messageText,
+                    isMe ? styles.myMessageText : styles.theirMessageText
+                ]}>{item.text}</Text>
+                <Text style={[
+                    styles.timeText,
+                    isMe ? { color: 'rgba(255,255,255,0.7)' } : { color: '#999' }
+                ]}>
+                    {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+            </View>
+        </View>
+    );
+  };
+
+  // --- RENDER ---
+
+  // 1. List View
+  if (!selectedConversation) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Messages</Text>
+          <View style={styles.connectionStatus}>
+            <View style={[styles.statusDot, { backgroundColor: isConnected ? '#4CAF50' : '#ff9800' }]} />
+            <Text style={styles.statusText}>{isConnected ? 'Online' : 'Connecting'}</Text>
+          </View>
+        </View>
+
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={PRIMARY_COLOR} />
+          </View>
+        ) : (
+          <FlatList
+            data={conversations}
+            renderItem={renderConversationItem}
+            keyExtractor={item => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>No conversations yet.</Text>
+              </View>
+            }
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          />
+        )}
       </SafeAreaView>
     );
   }
 
+  // 2. Chat View
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Messages</Text>
-        </View>
+    <SafeAreaView style={styles.chatContainer} edges={['top']}>
+      <View style={styles.chatHeaderContainer}>
+        <View style={styles.chatHeaderContent}>
+          <TouchableOpacity
+            onPress={() => setSelectedConversation(null)}
+            style={styles.backButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
 
-        {conversations.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No conversations yet</Text>
-            <Text style={styles.emptySubtext}>
-              Start chatting with your business partners
+          <View style={styles.headerCenter}>
+            <Text style={styles.chatTitle}>{selectedConversation.name}</Text>
+            <Text style={styles.chatSubtitle}>
+              {isConnected ? 'Active now' : 'Reconnecting...'}
             </Text>
           </View>
-        ) : (
-          <View style={styles.conversationsList}>
-            {conversations.map((conversation) => (
-              <TouchableOpacity
-                key={conversation.id}
-                style={styles.conversationItem}
-                onPress={() => setSelectedConversation(conversation)}
-              >
-                <View style={styles.conversationAvatar}>
-                  <Text style={styles.conversationAvatarText}>
-                    {conversation.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.conversationInfo}>
-                  <Text style={styles.conversationName}>{conversation.name}</Text>
-                  <Text style={styles.conversationCompany}>
-                    {conversation.company_name || 'Unknown Company'}
-                  </Text>
-                  <Text style={styles.conversationPreview}>
-                    {conversation.last_message || 'No messages yet'}
-                  </Text>
-                </View>
-                <View style={styles.conversationMeta}>
-                  {conversation.unread_count > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadCount}>
-                        {conversation.unread_count > 99 ? '99+' : conversation.unread_count}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+
+          <View style={{ width: 24 }} />
+        </View>
       </View>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <FlatList
+            data={messages}
+            renderItem={renderMessageItem}
+            keyExtractor={item => item._id.toString()}
+            inverted
+            contentContainerStyle={{ padding: 16 }}
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        />
+        
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <TextInput
+                style={styles.input}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Type a message..."
+                placeholderTextColor="#999"
+                multiline
+                maxLength={500}
+            />
+            <TouchableOpacity 
+                onPress={handleSend} 
+                style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+                disabled={!inputText.trim()}
+            >
+                <Ionicons name="send" size={20} color="#fff" style={{ marginLeft: 2 }} />
+            </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   container: {
     flex: 1,
-    backgroundColor: '#f0f2f5',
+    backgroundColor: BG_COLOR,
   },
+  chatContainer: {
+    flex: 1,
+    backgroundColor: '#f2f2f7',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // --- List Header ---
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 10,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    flex: 1,
-    letterSpacing: -0.3,
-  },
-  headerInfo: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#718096',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  backButton: {
-    marginRight: 16,
-    padding: 8,
-    marginLeft: -8,
-  },
-  backButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f0f2f5',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#718096',
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#2d3748',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 15,
-    color: '#718096',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  conversationsList: {
-    flex: 1,
-  },
-  conversationItem: {
-    flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f2f5',
-    alignItems: 'center',
+    borderBottomColor: '#eee',
   },
-  conversationAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#e2e8f0',
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    letterSpacing: -0.5,
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '600',
+  },
+  // --- Conversation List ---
+  listContent: {
+    padding: 16,
+  },
+  conversationCard: {
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    alignItems: 'center',
+    // Soft Shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  avatarContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  conversationAvatarText: {
-    color: '#4a5568',
-    fontSize: 22,
+  avatarText: {
+    fontSize: 20,
     fontWeight: '700',
   },
-  conversationInfo: {
+  cardContent: {
     flex: 1,
+    justifyContent: 'center',
   },
-  conversationName: {
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  cardName: {
     fontSize: 17,
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 4,
-    letterSpacing: -0.3,
+    flex: 1,
   },
-  conversationCompany: {
-    fontSize: 13,
-    color: '#718096',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
-  conversationPreview: {
-    fontSize: 15,
-    color: '#4a5568',
-    lineHeight: 20,
-  },
-  conversationMeta: {
-    alignItems: 'flex-end',
+  cardTime: {
+    fontSize: 12,
+    color: '#999',
     marginLeft: 8,
   },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardCompany: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
   unreadBadge: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
+    backgroundColor: PRIMARY_COLOR,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    marginTop: 8,
+    paddingHorizontal: 6,
+    marginLeft: 8,
   },
-  unreadCount: {
+  unreadText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
-  textInput: {
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 100,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#999',
+    fontWeight: '500',
+  },
+  // --- Chat Screen Header ---
+  chatHeaderContainer: {
     backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    zIndex: 10,
+  },
+  chatHeaderContent: {
+    height: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerCenter: {
+    alignItems: 'center',
+  },
+  chatTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#000',
+  },
+  chatSubtitle: {
+    fontSize: 11,
+    color: '#4CAF50',
+    marginTop: 1,
+  },
+  // --- Message Styles ---
+  messageRow: {
+    marginBottom: 12,
+    flexDirection: 'row',
+  },
+  myMessageRow: {
+    justifyContent: 'flex-end',
+  },
+  theirMessageRow: {
+    justifyContent: 'flex-start',
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    padding: 12,
+    borderRadius: 16,
+  },
+  myMessage: {
+    backgroundColor: PRIMARY_COLOR,
+    borderBottomRightRadius: 4,
+  },
+  theirMessage: {
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  myMessageText: {
+    color: '#fff',
+  },
+  theirMessageText: {
+    color: '#333',
+  },
+  timeText: {
+    fontSize: 10,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  // --- Input Styles ---
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 10,
+    backgroundColor: '#fff',
+    alignItems: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
     borderRadius: 20,
     paddingHorizontal: 16,
+    paddingVertical: 10,
     paddingTop: 10,
-    paddingBottom: 10,
-    marginHorizontal: 10,
-    marginTop: 6,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    maxHeight: 100,
+    marginRight: 10,
     fontSize: 16,
-    lineHeight: 20,
+    color: '#333',
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: PRIMARY_COLOR,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#ccc',
   },
 });

@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.scp.mobile",
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
     }
