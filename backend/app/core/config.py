@@ -4,7 +4,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     app_name: str = "Supplier Consumer Platform"
     debug: bool = True
-    database_url: str = "postgresql+asyncpg://postgres:secret@localhost:5432/postgres"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
     jwt_secret_key: str = "CHANGE_ME_SECRET"
     jwt_refresh_secret_key: str = "CHANGE_ME_REFRESH_SECRET"
     jwt_algorithm: str = "HS256"

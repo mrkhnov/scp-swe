@@ -133,7 +133,7 @@ async def websocket_endpoint(
                 })
                 
         except WebSocketDisconnect:
-            manager.disconnect(user.id)
+            manager.disconnect(user.id, websocket)
             
     except HTTPException:
         await websocket.close(code=1008)  # Policy violation

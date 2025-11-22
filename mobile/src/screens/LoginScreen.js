@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -37,7 +37,7 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
@@ -73,7 +73,7 @@ export default function LoginScreen({ navigation }) {
             />
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
@@ -85,7 +85,7 @@ export default function LoginScreen({ navigation }) {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.linkButton}
             onPress={() => navigation.navigate('Register')}
           >
@@ -99,7 +99,7 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.footerText}>Demo Credentials:</Text>
           <Text style={styles.footerText}>Consumer: consumer@test.com / password123</Text>
           <Text style={styles.footerText}>Sales Rep: sales@test.com / password123</Text>
-          
+
           <View style={styles.debugInfo}>
             <Text style={styles.debugTitle}>Connection Info:</Text>
             <Text style={styles.debugText}>Platform: {Platform.OS}</Text>
@@ -116,110 +116,124 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f2f5',
   },
   content: {
     flex: 1,
     justifyContent: 'center',
-    padding: 20,
+    padding: 24,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 48,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '800',
     color: '#1a1a1a',
     marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
+    fontWeight: '500',
   },
   form: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 24,
+    padding: 32,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 5,
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: '#4a5568',
     marginBottom: 8,
+    marginLeft: 4,
   },
   input: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: '#f7fafc',
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#e2e8f0',
+    color: '#2d3748',
   },
   button: {
     backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: 12,
+    padding: 18,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
+    backgroundColor: '#90cdf4',
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   linkButton: {
-    marginTop: 16,
+    marginTop: 24,
     alignItems: 'center',
   },
   linkText: {
-    color: '#666',
+    color: '#718096',
     fontSize: 14,
   },
   linkTextBold: {
     color: '#007AFF',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   footer: {
-    marginTop: 30,
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    marginTop: 40,
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#e2e8f0',
   },
   footerText: {
     fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+    color: '#718096',
+    marginBottom: 6,
+    textAlign: 'center',
   },
   debugInfo: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 16,
+    paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#ddd',
+    borderTopColor: '#e2e8f0',
   },
   debugTitle: {
-    color: '#333',
+    color: '#4a5568',
     fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   debugText: {
-    color: '#666',
+    color: '#718096',
     fontSize: 11,
-    marginBottom: 2,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginBottom: 4,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });

@@ -15,24 +15,33 @@ class ConnectionManager:
     """Manages WebSocket connections for real-time chat"""
     
     def __init__(self):
-        # Maps user_id to WebSocket connection
-        self.active_connections: Dict[int, WebSocket] = {}
+        # Maps user_id to List of WebSocket connections
+        self.active_connections: Dict[int, list[WebSocket]] = {}
 
     async def connect(self, user_id: int, websocket: WebSocket):
         """Accept and store a new WebSocket connection"""
         await websocket.accept()
-        self.active_connections[user_id] = websocket
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(websocket)
 
-    def disconnect(self, user_id: int):
+    def disconnect(self, user_id: int, websocket: WebSocket):
         """Remove a WebSocket connection"""
         if user_id in self.active_connections:
-            del self.active_connections[user_id]
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
+            if not self.active_connections[user_id]:
+                del self.active_connections[user_id]
 
     async def send_personal_message(self, message: dict, user_id: int):
         """Send a message to a specific user if they're connected"""
         if user_id in self.active_connections:
-            websocket = self.active_connections[user_id]
-            await websocket.send_json(message)
+            for connection in self.active_connections[user_id]:
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    # Handle stale connections
+                    pass
 
     async def broadcast_to_company(self, message: dict, company_id: int, db: AsyncSession):
         """Broadcast a message to all connected users in a company"""
@@ -46,14 +55,22 @@ class ConnectionManager:
         # Send to all connected users from this company
         for user_id in company_user_ids:
             if user_id in self.active_connections:
-                await self.active_connections[user_id].send_json(message)
+                for connection in self.active_connections[user_id]:
+                    try:
+                        await connection.send_json(message)
+                    except Exception:
+                        pass
 
     async def broadcast(self, message: dict, exclude_user_id: int = None):
         """Broadcast a message to all connected users"""
-        for user_id, connection in self.active_connections.items():
+        for user_id, connections in self.active_connections.items():
             if exclude_user_id and user_id == exclude_user_id:
                 continue
-            await connection.send_json(message)
+            for connection in connections:
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    pass
 
 
 # Global connection manager instance

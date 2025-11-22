@@ -7,7 +7,7 @@ const getApiUrl = () => {
     return 'http://localhost:8000';
   }
   // Replace this IP with your computer's local IP address
-  return 'http://192.168.0.174:8000';
+  return 'https://petite-emus-fix.loca.lt';
 };
 
 const API_URL = getApiUrl();
@@ -16,6 +16,10 @@ class ApiService {
   constructor() {
     this.accessToken = null;
     this.refreshToken = null;
+  }
+
+  getApiUrl() {
+    return API_URL;
   }
 
   async setTokens(accessToken, refreshToken) {
@@ -48,7 +52,7 @@ class ApiService {
     }
 
     const config = {
-      timeout: 10000, // 10 second timeout
+      timeout: 20000, // 20 second timeout (increased for tunnel stability)
       ...options,
       headers,
     };
@@ -60,16 +64,16 @@ class ApiService {
       // Create AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), config.timeout);
-      
+
       const response = await fetch(url, {
         ...config,
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       console.log('API Response:', { status: response.status, statusText: response.statusText });
-      
+
       if (response.status === 401 && this.refreshToken && !options.skipRefresh) {
         // Try to refresh token
         const refreshed = await this.refreshAccessToken();
@@ -94,17 +98,17 @@ class ApiService {
         console.error('API Request Timeout:', url);
         throw new Error('Network request timed out. Please check your connection and try again.');
       }
-      
+
       console.error('API Request Error:', {
         url,
         error: error.message,
         type: error.name
       });
-      
+
       if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
         throw new Error(`Cannot connect to server at ${API_URL}. Please check:\n1. Your internet connection\n2. That the backend server is running\n3. That your device is on the same network`);
       }
-      
+
       throw error;
     }
   }
@@ -134,12 +138,12 @@ class ApiService {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       const response = await fetch(`${API_URL}/docs`, {
         method: 'GET',
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
@@ -157,19 +161,19 @@ class ApiService {
       // Test connection first
       const connected = await this.testConnection();
       if (!connected) {
-        throw new Error(`Cannot connect to server at ${API_URL}.\n\nPlease check:\n• Your internet connection\n• That the backend server is running\n• That your device is connected to the same network as the server\n\nServer should be accessible at: http://192.168.0.174:8000`);
+        throw new Error(`Cannot connect to server at ${API_URL}.\n\nPossible causes:\n1. The tunnel URL might have expired or changed.\n2. The backend server is not running.\n3. No internet connection.\n\nCurrent URL: ${API_URL}`);
       }
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased timeout to 15s for tunnel
+
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
 
       console.log('Login response status:', response.status);
@@ -184,7 +188,7 @@ class ApiService {
       return data;
     } catch (error) {
       if (error.name === 'AbortError') {
-        throw new Error('Login request timed out. Please check your connection.');
+        throw new Error('Login request timed out. The tunnel connection might be slow or down. Please try again.');
       }
       throw error;
     }
@@ -281,7 +285,7 @@ class ApiService {
     try {
       // Use sales-reps endpoint to get potential chat partners
       const partners = await this.request('/auth/sales-reps');
-      
+
       // Get unread counts for each partner - with better error handling
       let unreadCounts = {};
       try {
@@ -290,7 +294,7 @@ class ApiService {
         console.warn('Failed to get unread counts:', error);
         // Continue without unread counts
       }
-      
+
       // Transform to conversation format
       return partners.map(partner => ({
         id: partner.id,
@@ -367,7 +371,7 @@ class ApiService {
     // Get all available suppliers and filter client-side if query provided
     const suppliers = await this.request('/links/available-suppliers');
     if (!query) return suppliers;
-    
+
     const searchLower = query.toLowerCase();
     return suppliers.filter(s => s.name.toLowerCase().includes(searchLower));
   }

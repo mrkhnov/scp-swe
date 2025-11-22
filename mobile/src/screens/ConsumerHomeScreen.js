@@ -36,7 +36,7 @@ export default function ConsumerHomeScreen({ navigation }) {
   };
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => {
@@ -72,8 +72,8 @@ export default function ConsumerHomeScreen({ navigation }) {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('Catalog')}
         >
@@ -81,7 +81,7 @@ export default function ConsumerHomeScreen({ navigation }) {
           <Text style={styles.actionButtonText}>Browse Products</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('Orders')}
         >
@@ -89,7 +89,7 @@ export default function ConsumerHomeScreen({ navigation }) {
           <Text style={styles.actionButtonText}>My Orders</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('Suppliers')}
         >
@@ -97,7 +97,7 @@ export default function ConsumerHomeScreen({ navigation }) {
           <Text style={styles.actionButtonText}>Find Suppliers</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.actionButton}
           onPress={() => navigation.navigate('Complaints')}
         >
@@ -112,96 +112,121 @@ export default function ConsumerHomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f2f5',
   },
   header: {
     backgroundColor: '#007AFF',
-    padding: 20,
-    paddingTop: 50,
+    padding: 24,
+    paddingTop: 60,
+    paddingBottom: 32,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
   },
   welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '800',
     color: '#fff',
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   emailText: {
     fontSize: 14,
-    color: '#fff',
-    opacity: 0.9,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
   },
   logoutButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   logoutText: {
     color: '#fff',
     fontWeight: '600',
+    fontSize: 14,
   },
   statsContainer: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 12,
+    padding: 20,
+    gap: 16,
+    marginTop: -24,
   },
   statCard: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 20,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   statNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1a1a1a',
     marginBottom: 4,
+    letterSpacing: -1,
   },
   complaintNumber: {
     color: '#FF3B30',
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: '#718096',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   section: {
-    padding: 16,
+    padding: 24,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#1a1a1a',
+    fontWeight: '700',
+    marginBottom: 20,
+    color: '#2d3748',
+    letterSpacing: -0.5,
   },
   actionButton: {
     backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f7fafc',
   },
   actionIcon: {
-    fontSize: 24,
-    marginRight: 16,
+    fontSize: 28,
+    marginRight: 20,
+    backgroundColor: '#f7fafc',
+    padding: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   actionButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1a1a',
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#2d3748',
+    letterSpacing: -0.3,
   },
 });

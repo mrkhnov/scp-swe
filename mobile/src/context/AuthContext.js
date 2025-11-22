@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import api from '../services/api';
+import { decode as atob } from 'base-64';
 
 const AuthContext = createContext();
 
