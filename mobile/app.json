@@ -13,7 +13,8 @@
       "bundleIdentifier": "com.scp.mobile"
     },
     "android": {
-      "package": "com.scp.mobile"
+      "package": "com.scp.mobile",
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
     }

@@ -11,6 +11,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
@@ -98,6 +99,14 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.footerText}>Demo Credentials:</Text>
           <Text style={styles.footerText}>Consumer: consumer@test.com / password123</Text>
           <Text style={styles.footerText}>Sales Rep: sales@test.com / password123</Text>
+          
+          <View style={styles.debugInfo}>
+            <Text style={styles.debugTitle}>Connection Info:</Text>
+            <Text style={styles.debugText}>Platform: {Platform.OS}</Text>
+            <Text style={styles.debugText}>
+              Server: {Platform.OS === 'web' ? 'http://localhost:8000' : 'http://192.168.0.174:8000'}
+            </Text>
+          </View>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -194,5 +203,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 4,
+  },
+  debugInfo: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+  },
+  debugTitle: {
+    color: '#333',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  debugText: {
+    color: '#666',
+    fontSize: 11,
+    marginBottom: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
 });

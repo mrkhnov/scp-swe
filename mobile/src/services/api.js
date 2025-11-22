@@ -48,14 +48,25 @@ class ApiService {
     }
 
     const config = {
+      timeout: 10000, // 10 second timeout
       ...options,
       headers,
     };
 
-    console.log('API Request:', { url: `${API_URL}${endpoint}`, method: config.method || 'GET' });
+    const url = `${API_URL}${endpoint}`;
+    console.log('API Request:', { url, method: config.method || 'GET' });
 
     try {
-      const response = await fetch(`${API_URL}${endpoint}`, config);
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+      
+      const response = await fetch(url, {
+        ...config,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
       
       console.log('API Response:', { status: response.status, statusText: response.statusText });
       
@@ -79,7 +90,21 @@ class ApiService {
       }
       return null;
     } catch (error) {
-      console.error('API Request Error:', error);
+      if (error.name === 'AbortError') {
+        console.error('API Request Timeout:', url);
+        throw new Error('Network request timed out. Please check your connection and try again.');
+      }
+      
+      console.error('API Request Error:', {
+        url,
+        error: error.message,
+        type: error.name
+      });
+      
+      if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
+        throw new Error(`Cannot connect to server at ${API_URL}. Please check:\n1. Your internet connection\n2. That the backend server is running\n3. That your device is on the same network`);
+      }
+      
       throw error;
     }
   }
@@ -104,26 +129,65 @@ class ApiService {
     }
   }
 
+  // Network connectivity test
+  async testConnection() {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${API_URL}/docs`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (error) {
+      console.log('Connection test failed:', error.message);
+      return false;
+    }
+  }
+
   // Auth
   async login(email, password) {
-    console.log('Login request to:', `${API_URL}/auth/token`);
+    const url = `${API_URL}/auth/token`;
+    console.log('Login request to:', url);
 
-    const response = await fetch(`${API_URL}/auth/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      // Test connection first
+      const connected = await this.testConnection();
+      if (!connected) {
+        throw new Error(`Cannot connect to server at ${API_URL}.\n\nPlease check:\n• Your internet connection\n• That the backend server is running\n• That your device is connected to the same network as the server\n\nServer should be accessible at: http://192.168.0.174:8000`);
+      }
 
-    console.log('Login response status:', response.status);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Login failed' }));
-      throw new Error(error.detail || 'Invalid credentials');
+      console.log('Login response status:', response.status);
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Login failed' }));
+        throw new Error(error.detail || 'Invalid credentials');
+      }
+
+      const data = await response.json();
+      await this.setTokens(data.access_token, data.refresh_token);
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Login request timed out. Please check your connection.');
+      }
+      throw error;
     }
-
-    const data = await response.json();
-    await this.setTokens(data.access_token, data.refresh_token);
-    return data;
   }
 
   async register(userData) {
