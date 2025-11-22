@@ -9,9 +9,11 @@ import {
   Image,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
 
-export default function ProductCatalogScreen() {
+export default function ProductCatalogScreen({ navigation }) {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,17 +102,25 @@ export default function ProductCatalogScreen() {
         style={styles.addButton}
         onPress={() => addToCart(item)}
       >
-        <Text style={styles.addButtonText}>Add to Cart</Text>
+        <Text style={styles.addButtonText}>Add</Text>
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Product Catalog</Text>
+      </View>
+
       <FlatList
         data={products}
         renderItem={renderProduct}
         keyExtractor={item => item.id.toString()}
+        contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => {
             setRefreshing(true);
@@ -123,15 +133,18 @@ export default function ProductCatalogScreen() {
           </Text>
         }
       />
+
       {cart.length > 0 && (
         <View style={styles.cartFooter}>
-          <Text style={styles.cartText}>Cart: {cart.length} item(s)</Text>
+          <Text style={styles.cartText}>
+            {cart.reduce((sum, item) => sum + item.quantity, 0)} items in cart
+          </Text>
           <TouchableOpacity style={styles.checkoutButton} onPress={checkout}>
             <Text style={styles.checkoutButtonText}>Checkout</Text>
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -140,13 +153,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  productCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    padding: 16,
+  header: {
     flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 8,
+    marginLeft: -8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  listContent: {
+    padding: 16,
+  },
+  productCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

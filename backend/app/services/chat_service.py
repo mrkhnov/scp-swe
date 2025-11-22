@@ -188,11 +188,11 @@ class ChatService:
             file_size = len(content)
             await f.write(content)
         
-        # Validate file size (10MB limit)
-        max_size = 10 * 1024 * 1024  # 10MB
+        # Validate file size (100MB limit)
+        max_size = 100 * 1024 * 1024  # 100MB
         if file_size > max_size:
             os.unlink(file_path)  # Delete the file
-            raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
+            raise HTTPException(status_code=400, detail="File size exceeds 100MB limit")
         
         return str(file_path), file.filename, file_size
 

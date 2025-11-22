@@ -267,8 +267,8 @@ export default function ChatScreen() {
       if (result.canceled) return;
 
       const file = result.assets[0];
-      if (file.size > 10 * 1024 * 1024) {
-        Alert.alert('Error', 'File size must be less than 10MB');
+      if (file.size > 100 * 1024 * 1024) {
+        Alert.alert('Error', 'File size must be less than 100MB');
         return;
       }
 
