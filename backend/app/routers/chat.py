@@ -1,8 +1,9 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException, UploadFile, File, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException, UploadFile, File, status, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt, JWTError
 import os
+import mimetypes
 from pathlib import Path
 
 from app.db.session import get_db
@@ -304,15 +305,24 @@ async def upload_chat_file(
         raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
 
 
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException, UploadFile, File, status, Request, Response
+from fastapi.responses import FileResponse, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+import os
+from pathlib import Path
+import mimetypes
+
+# ... imports ...
+
 @router.get("/files/{filename}")
 async def serve_chat_file(
+    request: Request,
     filename: str,
     token: str = Query(..., description="JWT token for authentication"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Serve uploaded chat files with token-based authentication.
-    URL format: /chat/files/{filename}?token=JWT_TOKEN
+    Serve uploaded chat files with token-based authentication and Range support.
     """
     try:
         # Authenticate user from token
@@ -322,30 +332,62 @@ async def serve_chat_file(
         
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="File not found")
-        
-        # Additional security: verify user has access to this file
-        # (For now, any authenticated user can access any chat file)
-        # In production, you might want to verify the user is part of the conversation
+            
+        file_size = os.path.getsize(file_path)
         
         # Determine media type
-        if filename.endswith('.pdf'):
-            media_type = "application/pdf"
-        elif filename.endswith('.mp3'):
-            media_type = "audio/mpeg"
-        elif filename.endswith('.wav'):
-            media_type = "audio/wav"
-        elif filename.endswith('.m4a'):
-            media_type = "audio/mp4"
-        else:
+        media_type, _ = mimetypes.guess_type(file_path)
+        if not media_type:
             media_type = "application/octet-stream"
-        
+
+        # Handle Range header
+        range_header = request.headers.get("range")
+        if range_header:
+            from fastapi.responses import StreamingResponse
+            
+            byte1, byte2 = 0, None
+            
+            match = range_header.replace("bytes=", "").split("-")
+            if match[0]:
+                byte1 = int(match[0])
+            if match[1]:
+                byte2 = int(match[1])
+            
+            if byte2 is None:
+                byte2 = file_size - 1
+                
+            length = byte2 - byte1 + 1
+            
+            def iterfile():
+                with open(file_path, "rb") as f:
+                    f.seek(byte1)
+                    data = f.read(length)
+                    yield data
+            
+            headers = {
+                "Content-Range": f"bytes {byte1}-{byte2}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(length),
+                "Content-Type": media_type,
+            }
+            
+            return StreamingResponse(
+                iterfile(), 
+                status_code=206, 
+                headers=headers, 
+                media_type=media_type
+            )
+            
+        # No range header, return full file
         return FileResponse(
             path=str(file_path),
             media_type=media_type,
-            filename=filename
+            filename=filename,
+            headers={"Accept-Ranges": "bytes"}
         )
         
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        print(f"Error serving file: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")

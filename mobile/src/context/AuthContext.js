@@ -18,6 +18,8 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     loadUser();
+    // Register logout callback with API service
+    api.setLogoutCallback(logout);
   }, []);
 
   const loadUser = async () => {

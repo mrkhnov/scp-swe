@@ -7,7 +7,7 @@ const getApiUrl = () => {
     return 'http://localhost:8000';
   }
   // Replace this IP with your computer's local IP address
-  return 'http://192.168.0.159:8000';
+  return 'http://172.20.10.2:8000';
 };
 
 const API_URL = getApiUrl();
@@ -16,6 +16,11 @@ class ApiService {
   constructor() {
     this.accessToken = null;
     this.refreshToken = null;
+    this.onLogout = null;
+  }
+
+  setLogoutCallback(callback) {
+    this.onLogout = callback;
   }
 
   getApiUrl() {
@@ -46,6 +51,11 @@ class ApiService {
       'Content-Type': 'application/json',
       ...options.headers,
     };
+
+    // If body is FormData, let fetch handle Content-Type (it needs to set boundary)
+    if (options.body instanceof FormData) {
+      delete headers['Content-Type'];
+    }
 
     if (this.accessToken && !options.skipAuth) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
@@ -81,6 +91,17 @@ class ApiService {
           // Retry original request
           return this.request(endpoint, { ...options, skipRefresh: true });
         }
+      }
+
+      if (response.status === 401) {
+        // If we are here, it means either:
+        // 1. No refresh token available
+        // 2. Refresh token failed
+        // So we should logout
+        if (this.onLogout) {
+          this.onLogout();
+        }
+        throw new Error('Session expired. Please login again.');
       }
 
       if (!response.ok) {
@@ -345,6 +366,20 @@ class ApiService {
   async markAsRead(partnerId) {
     // Backend marks as read when fetching history
     return Promise.resolve();
+  }
+
+  async uploadFile(recipientId, file) {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      type: file.mimeType || file.type || 'application/octet-stream',
+      name: file.name ? encodeURIComponent(file.name) : 'upload.bin',
+    });
+
+    return this.request(`/chat/upload-file?recipient_id=${recipientId}`, {
+      method: 'POST',
+      body: formData,
+    });
   }
 
   // Links/Connections

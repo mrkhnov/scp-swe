@@ -11,16 +11,92 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   TextInput,
+  Linking,
+  LogBox,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import { Audio } from 'expo-av';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { COLORS } from '../constants/colors';
 
+// Ignore deprecation warning for now as we need expo-av for this version
+LogBox.ignoreLogs(['Expo AV has been deprecated']);
+
 // Constants
 const PRIMARY_COLOR = COLORS.primary || '#007AFF';
 const BG_COLOR = '#f8f9fa';
+
+const VoiceMessage = ({ uri, isMe }) => {
+  const [sound, setSound] = useState();
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function playSound() {
+    try {
+      if (sound) {
+        if (isPlaying) {
+          await sound.pauseAsync();
+          setIsPlaying(false);
+        } else {
+          await sound.playAsync();
+          setIsPlaying(true);
+        }
+      } else {
+        setIsLoading(true);
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri },
+          { shouldPlay: true }
+        );
+        setSound(newSound);
+        setIsPlaying(true);
+        setIsLoading(false);
+
+        newSound.setOnPlaybackStatusUpdate((status) => {
+          if (status.didJustFinish) {
+            setIsPlaying(false);
+            newSound.setPositionAsync(0);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error playing sound:', error);
+      setIsLoading(false);
+      Alert.alert('Error', 'Could not play audio');
+    }
+  }
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
+
+  return (
+    <View style={styles.voiceMessageContainer}>
+      <TouchableOpacity onPress={playSound} disabled={isLoading}>
+        {isLoading ? (
+           <ActivityIndicator size="small" color={isMe ? '#fff' : '#333'} />
+        ) : (
+           <Ionicons 
+             name={isPlaying ? "pause-circle" : "play-circle"} 
+             size={36} 
+             color={isMe ? '#fff' : '#333'} 
+           />
+        )}
+      </TouchableOpacity>
+      <View style={styles.voiceMessageInfo}>
+        <Text style={[styles.voiceMessageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
+          {isPlaying ? 'Playing...' : 'Voice Message'}
+        </Text>
+      </View>
+    </View>
+  );
+};
 
 export default function ChatScreen() {
   const { user } = useAuth();
@@ -33,6 +109,9 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [recording, setRecording] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Refs
   const wsRef = useRef(null);
@@ -128,6 +207,10 @@ export default function ChatScreen() {
             _id: data.sender_id,
             name: data.sender_id === user.id ? 'Me' : currentConv.name,
           },
+          message_type: data.message_type,
+          file_name: data.file_name,
+          file_size: data.file_size,
+          attachment_url: data.attachment_url,
         };
 
         setMessages(previousMessages => {
@@ -156,6 +239,10 @@ export default function ChatScreen() {
           _id: msg.sender_id,
           name: msg.sender_id === user.id ? 'Me' : 'Partner',
         },
+        message_type: msg.message_type,
+        file_name: msg.file_name,
+        file_size: msg.file_size,
+        attachment_url: msg.attachment_url,
       }));
       setMessages(formattedMessages.reverse());
     } catch (error) {
@@ -169,7 +256,93 @@ export default function ChatScreen() {
     loadMessages(conv.id);
   };
 
-  // 6. Send Message
+  // 6. File & Audio Handling
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) return;
+
+      const file = result.assets[0];
+      if (file.size > 10 * 1024 * 1024) {
+        Alert.alert('Error', 'File size must be less than 10MB');
+        return;
+      }
+
+      uploadFile(file);
+    } catch (err) {
+      console.error('Document picker error:', err);
+      Alert.alert('Error', 'Failed to pick document');
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission needed', 'Audio recording permission is required');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      setRecording(recording);
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Failed to start recording', err);
+      Alert.alert('Error', 'Failed to start recording');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+
+    setIsRecording(false);
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      
+      // Create file object for upload
+      const file = {
+        uri,
+        type: 'audio/m4a',
+        name: 'voice_message.m4a',
+      };
+
+      uploadFile(file);
+      setRecording(null);
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+    }
+  };
+
+  const uploadFile = async (file) => {
+    if (!selectedConversation) return;
+
+    setUploading(true);
+    try {
+      const response = await api.uploadFile(selectedConversation.id, file);
+      // Message will be received via WebSocket
+      console.log('File uploaded:', response);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      Alert.alert('Error', 'Failed to upload file');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // 7. Send Message
   const handleSend = () => {
     if (!inputText.trim()) return;
     
@@ -222,6 +395,61 @@ export default function ChatScreen() {
     </TouchableOpacity>
   );
 
+  const openAttachment = async (url) => {
+    if (!url) return;
+    const fullUrl = url.startsWith('http') ? url : `${api.getApiUrl()}${url}?token=${api.accessToken}`;
+    try {
+      const supported = await Linking.canOpenURL(fullUrl);
+      if (supported) {
+        await Linking.openURL(fullUrl);
+      } else {
+        Alert.alert('Error', 'Cannot open this file');
+      }
+    } catch (err) {
+      console.error('Failed to open URL:', err);
+    }
+  };
+
+  const renderMessageContent = (item, isMe) => {
+    const textColor = isMe ? styles.myMessageText : styles.theirMessageText;
+
+    if (item.message_type === 'PDF') {
+      return (
+        <TouchableOpacity 
+          style={styles.attachmentContainer}
+          onPress={() => openAttachment(item.attachment_url)}
+        >
+          <Ionicons name="document-text" size={24} color={isMe ? '#fff' : '#333'} />
+          <View style={styles.attachmentInfo}>
+            <Text style={[styles.attachmentName, textColor]} numberOfLines={1}>
+              {item.file_name ? decodeURIComponent(item.file_name) : 'Document.pdf'}
+            </Text>
+            {item.file_size && (
+              <Text style={[styles.attachmentSize, textColor, { opacity: 0.7 }]}>
+                {(item.file_size / 1024 / 1024).toFixed(1)} MB
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    if (item.message_type === 'AUDIO') {
+      const fullUrl = item.attachment_url.startsWith('http') 
+        ? item.attachment_url 
+        : `${api.getApiUrl()}${item.attachment_url}?token=${api.accessToken}`;
+
+      return (
+        <VoiceMessage 
+          uri={fullUrl} 
+          isMe={isMe} 
+        />
+      );
+    }
+
+    return <Text style={[styles.messageText, textColor]}>{item.text}</Text>;
+  };
+
   const renderMessageItem = ({ item }) => {
     const isMe = item.user._id === user.id;
     return (
@@ -233,10 +461,7 @@ export default function ChatScreen() {
                 styles.messageBubble,
                 isMe ? styles.myMessage : styles.theirMessage
             ]}>
-                <Text style={[
-                    styles.messageText,
-                    isMe ? styles.myMessageText : styles.theirMessageText
-                ]}>{item.text}</Text>
+                {renderMessageContent(item, isMe)}
                 <Text style={[
                     styles.timeText,
                     isMe ? { color: 'rgba(255,255,255,0.7)' } : { color: '#999' }
@@ -325,22 +550,44 @@ export default function ChatScreen() {
         />
         
         <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <TouchableOpacity 
+                onPress={handlePickDocument}
+                style={styles.attachButton}
+                disabled={uploading}
+            >
+                <Ionicons name="attach" size={24} color="#666" />
+            </TouchableOpacity>
+
             <TextInput
                 style={styles.input}
                 value={inputText}
                 onChangeText={setInputText}
-                placeholder="Type a message..."
+                placeholder={isRecording ? "Recording..." : "Type a message..."}
                 placeholderTextColor="#999"
                 multiline
                 maxLength={500}
+                editable={!isRecording}
             />
-            <TouchableOpacity 
-                onPress={handleSend} 
-                style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-                disabled={!inputText.trim()}
-            >
-                <Ionicons name="send" size={20} color="#fff" style={{ marginLeft: 2 }} />
-            </TouchableOpacity>
+            
+            {inputText.trim() ? (
+                <TouchableOpacity 
+                    onPress={handleSend} 
+                    style={styles.sendButton}
+                >
+                    <Ionicons name="send" size={20} color="#fff" style={{ marginLeft: 2 }} />
+                </TouchableOpacity>
+            ) : (
+                <TouchableOpacity 
+                    onPress={isRecording ? stopRecording : startRecording}
+                    style={[styles.sendButton, isRecording && styles.recordingButton]}
+                >
+                    <Ionicons 
+                        name={isRecording ? "stop" : "mic"} 
+                        size={20} 
+                        color="#fff" 
+                    />
+                </TouchableOpacity>
+            )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -577,6 +824,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  attachButton: {
+    padding: 10,
+    marginRight: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   sendButton: {
     width: 40,
     height: 40,
@@ -585,7 +838,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  recordingButton: {
+    backgroundColor: '#ff4444',
+  },
   sendButtonDisabled: {
     backgroundColor: '#ccc',
+  },
+  // --- Attachment Styles ---
+  attachmentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 8,
+  },
+  attachmentInfo: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  attachmentName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  attachmentSize: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  // --- Voice Message Styles ---
+  voiceMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 120,
+  },
+  voiceMessageInfo: {
+    marginLeft: 10,
+    justifyContent: 'center',
+  },
+  voiceMessageText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

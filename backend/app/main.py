@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
@@ -17,6 +17,14 @@ app = FastAPI(
     debug=settings.debug,
     version="1.0.0"
 )
+
+# Middleware to add Accept-Ranges header for iOS audio playback
+@app.middleware("http")
+async def add_accept_ranges_header(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/uploads/"):
+        response.headers["Accept-Ranges"] = "bytes"
+    return response
 
 # CORS middleware
 app.add_middleware(
