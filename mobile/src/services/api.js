@@ -328,6 +328,16 @@ class ApiService {
     return this.request('/chat/unread-counts');
   }
 
+  async sendMessage(recipientId, content) {
+    return this.request('/chat/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        recipient_id: recipientId,
+        content: content,
+      }),
+    });
+  }
+
   async markAsRead(partnerId) {
     // Backend marks as read when fetching history
     return Promise.resolve();

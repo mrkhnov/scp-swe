@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  GiftedChat
-} from 'react-native-gifted-chat';
+import { GiftedChat, Bubble } from 'react-native-gifted-chat';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { COLORS } from '../constants/colors';
@@ -15,14 +13,11 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingText, setTypingText] = useState('');
 
   // Use refs to avoid dependency issues
   const wsRef = useRef(null);
   const selectedConversationRef = useRef(null);
   const isLoadingConversationsRef = useRef(false);
-  const typingTimeoutRef = useRef(null);
 
   // Early return if still loading auth or no user
   if (authLoading) {
@@ -102,20 +97,6 @@ export default function ChatScreen() {
         const data = JSON.parse(event.data);
         console.log('WebSocket message received:', data);
         
-        // Handle typing indicators
-        if (data.type === 'typing') {
-          const currentConversation = selectedConversationRef.current;
-          if (currentConversation && data.sender_id === currentConversation.id) {
-            setIsTyping(data.isTyping);
-            if (data.isTyping) {
-              setTypingText(`${currentConversation.name} is typing...`);
-            } else {
-              setTypingText('');
-            }
-          }
-          return;
-        }
-
         // Only handle messages if we're in the correct conversation
         const currentConversation = selectedConversationRef.current;
         const isRelevantMessage = currentConversation && (
@@ -131,13 +112,7 @@ export default function ChatScreen() {
             user: {
               _id: data.sender_id,
               name: data.sender_id === user.id ? user.email : currentConversation.name,
-              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                data.sender_id === user.id ? user.email : currentConversation.name
-              )}&background=${data.sender_id === user.id ? '0084ff' : '666666'}&color=fff&size=40`,
             },
-            sent: true,
-            received: data.sender_id !== user.id,
-            pending: false,
           };
 
           // Only add if message doesn't already exist
@@ -197,13 +172,7 @@ export default function ChatScreen() {
         user: {
           _id: msg.sender_id,
           name: msg.sender_id === user.id ? user.email : conversationName,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            msg.sender_id === user.id ? user.email : conversationName
-          )}&background=${msg.sender_id === user.id ? '0084ff' : '666666'}&color=fff&size=40`,
         },
-        sent: true,
-        received: msg.sender_id !== user.id,
-        pending: false,
       }));
 
       // Sort messages by createdAt (newest first, which is what GiftedChat expects)
@@ -218,6 +187,8 @@ export default function ChatScreen() {
     }
   }, [user?.id, user?.email]);
 
+
+
   const onSend = useCallback(async (newMessages = []) => {
     const message = newMessages[0];
     if (!message?.text?.trim() || !selectedConversation) {
@@ -228,9 +199,6 @@ export default function ChatScreen() {
     const messageWithId = {
       ...message,
       _id: `temp_${Date.now()}_${Math.random()}`,
-      pending: true,
-      sent: false,
-      received: false,
     };
 
     try {
@@ -241,21 +209,10 @@ export default function ChatScreen() {
       await api.sendMessage(selectedConversation.id, message.text);
       console.log('Message sent successfully');
       
-      // Update message status to sent
+      // Remove the temporary message since the real one will come via WebSocket
       setMessages(previousMessages => 
-        previousMessages.map(msg => 
-          msg._id === messageWithId._id 
-            ? { ...msg, pending: false, sent: true }
-            : msg
-        )
+        previousMessages.filter(msg => msg._id !== messageWithId._id)
       );
-      
-      // Remove the temporary message after a delay (real one will come via WebSocket)
-      setTimeout(() => {
-        setMessages(previousMessages => 
-          previousMessages.filter(msg => msg._id !== messageWithId._id)
-        );
-      }, 1000);
     } catch (error) {
       console.error('Failed to send message:', error);
       Alert.alert('Error', 'Failed to send message');
@@ -267,7 +224,29 @@ export default function ChatScreen() {
     }
   }, [selectedConversation]);
 
-  // Removed custom renderers to fix mobile input issues
+  const renderBubble = (props) => {
+    return (
+      <Bubble
+        {...props}
+        wrapperStyle={{
+          right: {
+            backgroundColor: COLORS.primary,
+          },
+          left: {
+            backgroundColor: '#f0f0f0',
+          },
+        }}
+        textStyle={{
+          right: {
+            color: '#fff',
+          },
+          left: {
+            color: COLORS.text.primary,
+          },
+        }}
+      />
+    );
+  };
 
   if (loading) {
     return (
@@ -296,12 +275,7 @@ export default function ChatScreen() {
             >
               <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
-            <View style={styles.headerInfo}>
-              <Text style={styles.headerTitle}>{selectedConversation.name}</Text>
-              <Text style={styles.headerSubtitle}>
-                {selectedConversation.company_name || 'Online'}
-              </Text>
-            </View>
+            <Text style={styles.headerTitle}>{selectedConversation.name}</Text>
           </View>
 
           {loadingMessages ? (
@@ -315,23 +289,22 @@ export default function ChatScreen() {
               onSend={onSend}
               user={{
                 _id: user.id,
-                name: user.email,
               }}
+              renderBubble={renderBubble}
               placeholder="Type a message..."
-              alwaysShowSend={true}
-              showUserAvatar={false}
-              showAvatarForEveryMessage={false}
+              alwaysShowSend
+              scrollToBottom
+              scrollToBottomStyle={styles.scrollToBottom}
               textInputProps={{
+                autoFocus: false,
+                blurOnSubmit: false,
+                multiline: true,
+                maxLength: 1000,
                 editable: true,
-                multiline: false,
-                returnKeyType: 'send',
-                blurOnSubmit: true,
-                enablesReturnKeyAutomatically: true,
               }}
-              minInputToolbarHeight={44}
-              maxInputLength={1000}
-              keyboardShouldPersistTaps="never"
+              minInputToolbarHeight={60}
               bottomOffset={0}
+              keyboardShouldPersistTaps="handled"
             />
           )}
         </View>
@@ -349,9 +322,6 @@ export default function ChatScreen() {
         {conversations.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No conversations yet</Text>
-            <Text style={styles.emptySubtext}>
-              Start chatting with your business partners
-            </Text>
           </View>
         ) : (
           <View style={styles.conversationsList}>
@@ -361,29 +331,17 @@ export default function ChatScreen() {
                 style={styles.conversationItem}
                 onPress={() => setSelectedConversation(conversation)}
               >
-                <View style={styles.conversationAvatar}>
-                  <Text style={styles.conversationAvatarText}>
-                    {conversation.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
                 <View style={styles.conversationInfo}>
                   <Text style={styles.conversationName}>{conversation.name}</Text>
-                  <Text style={styles.conversationCompany}>
-                    {conversation.company_name || 'Unknown Company'}
-                  </Text>
                   <Text style={styles.conversationPreview}>
                     {conversation.last_message || 'No messages yet'}
                   </Text>
                 </View>
-                <View style={styles.conversationMeta}>
-                  {conversation.unread_count > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadCount}>
-                        {conversation.unread_count > 99 ? '99+' : conversation.unread_count}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                {conversation.unread_count > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadCount}>{conversation.unread_count}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -416,15 +374,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     flex: 1,
   },
-  headerInfo: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
-  },
   backButton: {
     marginRight: 16,
   },
@@ -446,16 +395,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
   },
   emptyText: {
-    fontSize: 18,
-    color: COLORS.text.primary,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
+    fontSize: 16,
     color: COLORS.text.secondary,
     textAlign: 'center',
   },
@@ -465,46 +407,24 @@ const styles = StyleSheet.create({
   conversationItem: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     alignItems: 'center',
-  },
-  conversationAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  conversationAvatarText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
   },
   conversationInfo: {
     flex: 1,
   },
   conversationName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: COLORS.text.primary,
-    marginBottom: 2,
-  },
-  conversationCompany: {
-    fontSize: 12,
-    color: COLORS.text.secondary,
     marginBottom: 4,
   },
   conversationPreview: {
     fontSize: 14,
     color: COLORS.text.secondary,
-  },
-  conversationMeta: {
-    alignItems: 'flex-end',
   },
   unreadBadge: {
     backgroundColor: COLORS.primary,
@@ -519,5 +439,31 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  inputToolbar: {
+    backgroundColor: COLORS.surface,
+    borderTopColor: COLORS.border,
+    paddingHorizontal: 8,
+    borderTopWidth: 1,
+  },
+  inputPrimary: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  inputAccessory: {
+    height: 44,
+  },
+  composerContainer: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginHorizontal: 8,
+  },
+  scrollToBottom: {
+    backgroundColor: COLORS.primary,
   },
 });

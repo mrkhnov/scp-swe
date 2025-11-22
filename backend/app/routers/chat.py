@@ -177,6 +177,54 @@ async def get_unread_counts(
     return counts
 
 
+@router.post("/send", response_model=ChatMessageResponse)
+async def send_message(
+    message_data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Send a chat message via REST API (alternative to WebSocket).
+    """
+    recipient_id = message_data.get("recipient_id")
+    content = message_data.get("content")
+    
+    if not recipient_id or not content:
+        raise HTTPException(
+            status_code=400, 
+            detail="recipient_id and content are required"
+        )
+    
+    # Verify recipient exists
+    recipient = await db.get(User, recipient_id)
+    if not recipient:
+        raise HTTPException(status_code=404, detail="Recipient not found")
+    
+    # Save message to database
+    message = await ChatService.save_message(
+        db, current_user.id, recipient_id, content, MessageType.TEXT
+    )
+    
+    # Prepare message payload for WebSocket broadcast
+    message_data = {
+        "type": "message",
+        "id": message.id,
+        "sender_id": message.sender_id,
+        "recipient_id": message.recipient_id,
+        "content": message.content,
+        "message_type": message.message_type.value,
+        "attachment_url": message.attachment_url,
+        "file_name": message.file_name,
+        "file_size": message.file_size,
+        "timestamp": message.timestamp.isoformat()
+    }
+    
+    # Send to recipient if online via WebSocket
+    await manager.send_personal_message(message_data, recipient_id)
+    
+    return message
+
+
 @router.post("/upload-file")
 async def upload_chat_file(
     file: UploadFile = File(...),
