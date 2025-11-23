@@ -61,14 +61,14 @@ export default function OrdersScreen({ navigation }) {
       <Text style={styles.orderDetail}>
         {user.role === 'CONSUMER' ? 'Supplier' : 'Consumer'} ID: {user.role === 'CONSUMER' ? item.supplier_id : item.consumer_id}
       </Text>
-      <Text style={styles.orderTotal}>Total: ${item.total_amount.toFixed(2)}</Text>
+      <Text style={styles.orderTotal}>Total: ₸{item.total_amount.toFixed(2)}</Text>
 
       {item.items && item.items.length > 0 && (
         <View style={styles.itemsContainer}>
           <Text style={styles.itemsTitle}>Items:</Text>
           {item.items.map((orderItem, index) => (
             <Text key={index} style={styles.itemText}>
-              • Product #{orderItem.product_id} - Qty: {orderItem.quantity} @ ${orderItem.unit_price_at_time}
+              • Product #{orderItem.product_id} - Qty: {orderItem.quantity} @ ₸{orderItem.unit_price_at_time}
             </Text>
           ))}
         </View>

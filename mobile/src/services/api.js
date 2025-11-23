@@ -7,7 +7,7 @@ const getApiUrl = () => {
     return 'http://localhost:8000';
   }
   // Replace this IP with your computer's local IP address
-  return 'http://192.168.0.159:8000';
+  return 'http://192.168.1.83:8000';
 };
 
 const API_URL = getApiUrl();

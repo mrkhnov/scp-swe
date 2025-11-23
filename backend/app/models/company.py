@@ -16,5 +16,5 @@ class Company(Base):
     kyb_status: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    users: Mapped[list["User"]] = relationship(back_populates="company")
-    products: Mapped[list["Product"]] = relationship(back_populates="supplier")
+    users: Mapped[list["User"]] = relationship(back_populates="company", cascade="all, delete-orphan")
+    products: Mapped[list["Product"]] = relationship(back_populates="supplier", cascade="all, delete-orphan")

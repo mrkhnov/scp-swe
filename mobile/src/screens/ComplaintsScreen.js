@@ -397,7 +397,7 @@ export default function ComplaintsScreen({ navigation }) {
                       ]}
                       onPress={() => setSelectedOrderId(order.id)}
                     >
-                      <Text>Order #{order.id} - ${order.total_amount.toFixed(2)}</Text>
+                      <Text>Order #{order.id} - ₸{order.total_amount.toFixed(2)}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

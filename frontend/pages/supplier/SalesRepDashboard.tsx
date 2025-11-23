@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
 import { Order, OrderStatus, Complaint, ComplaintStatus } from '../../types';
 import { useApp } from '../../App';
 
 export default function SalesRepDashboard() {
+    const { t } = useTranslation();
     return (
         <Routes>
             <Route path="/" element={<Overview />} />
@@ -17,6 +19,7 @@ export default function SalesRepDashboard() {
 // --- SUB-COMPONENTS ---
 
 function Overview() {
+    const { t } = useTranslation();
     const [orders, setOrders] = useState<Order[]>([]);
     const [complaints, setComplaints] = useState<Complaint[]>([]);
 
@@ -55,41 +58,41 @@ function Overview() {
     return (
         <div className="space-y-8 animate-in fade-in">
             <div>
-                <h2 className="text-2xl font-bold text-system-text tracking-tight">Sales Dashboard</h2>
-                <p className="text-system-textSec">Welcome back. Here's your overview.</p>
+                <h2 className="text-2xl font-bold text-system-text tracking-tight">{t('supplier.salesDashboard')}</h2>
+                <p className="text-system-textSec">{t('supplier.salesDashboardSubtitle')}</p>
             </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-3xl shadow-card border border-system-border/50">
-                    <div className="text-system-textSec text-sm font-medium uppercase tracking-wide mb-2">Pending Orders</div>
+                    <div className="text-system-textSec text-sm font-medium uppercase tracking-wide mb-2">{t('supplier.pendingOrders')}</div>
                     <div className="text-4xl font-bold text-system-text">{pendingOrders.length}</div>
                 </div>
                 <div className="bg-white p-6 rounded-3xl shadow-card border border-system-border/50">
-                    <div className="text-system-textSec text-sm font-medium uppercase tracking-wide mb-2">Open Complaints</div>
+                    <div className="text-system-textSec text-sm font-medium uppercase tracking-wide mb-2">{t('supplier.openComplaints')}</div>
                     <div className="text-4xl font-bold text-system-text">{openComplaints.length}</div>
                 </div>
                 <div className="bg-white p-6 rounded-3xl shadow-card border border-system-border/50">
-                    <div className="text-system-textSec text-sm font-medium uppercase tracking-wide mb-2">Total Orders</div>
+                    <div className="text-system-textSec text-sm font-medium uppercase tracking-wide mb-2">{t('supplier.totalOrders')}</div>
                     <div className="text-4xl font-bold text-system-text">{orders.length}</div>
                 </div>
             </div>
 
             {/* Recent Activity */}
             <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
-                <h3 className="text-lg font-semibold text-system-text mb-6">Recent Orders</h3>
+                <h3 className="text-lg font-semibold text-system-text mb-6">{t('supplier.recentOrders')}</h3>
                 {pendingOrders.length === 0 ? (
-                    <p className="text-system-textSec text-sm">No pending orders at the moment.</p>
+                    <p className="text-system-textSec text-sm">{t('supplier.noPendingOrders')}</p>
                 ) : (
                     <div className="space-y-4">
                         {pendingOrders.slice(0, 5).map(order => (
                             <div key={order.id} className="flex justify-between items-center p-5 bg-system-bg rounded-2xl border border-system-border/50">
                                 <div>
-                                    <span className="font-semibold text-system-text">Order #{order.id}</span>
-                                    <p className="text-xs text-system-textSec mt-1">Consumer #{order.consumer_id} • {order.items.length} items</p>
+                                    <span className="font-semibold text-system-text">{t('common.orders')} #{order.id}</span>
+                                    <p className="text-xs text-system-textSec mt-1">{t('login.consumer')} #{order.consumer_id} • {order.items.length} {t('supplier.items')}</p>
                                 </div>
                                 <div className="text-right">
-                                    <div className="font-bold text-system-text">${order.total_amount.toFixed(2)}</div>
+                                    <div className="font-bold text-system-text">₸{order.total_amount.toFixed(2)}</div>
                                     <span className="text-xs px-2 py-1 rounded-full bg-system-blue/10 text-system-blue">{order.status}</span>
                                 </div>
                             </div>
@@ -102,6 +105,7 @@ function Overview() {
 }
 
 function OrdersView() {
+    const { t } = useTranslation();
     const [orders, setOrders] = useState<Order[]>([]);
 
     useEffect(() => {
@@ -115,8 +119,8 @@ function OrdersView() {
 
     return (
         <div className="space-y-8 animate-in fade-in">
-            <h2 className="text-2xl font-bold text-system-text tracking-tight">Orders (Read-Only)</h2>
-            <p className="text-system-textSec -mt-4">View order information. Contact Manager or Owner to modify orders.</p>
+            <h2 className="text-2xl font-bold text-system-text tracking-tight">{t('supplier.ordersReadOnly')}</h2>
+            <p className="text-system-textSec -mt-4">{t('supplier.ordersReadOnlySubtitle')}</p>
             
             <div className="space-y-4">
                 {orders.map(order => (
@@ -124,7 +128,7 @@ function OrdersView() {
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <span className="font-bold text-lg text-system-text">Order #{order.id}</span>
+                                    <span className="font-bold text-lg text-system-text">{t('common.orders')} #{order.id}</span>
                                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                                         order.status === OrderStatus.PENDING ? 'bg-system-blue/10 text-system-blue' :
                                         order.status === OrderStatus.ACCEPTED ? 'bg-system-green/10 text-system-green' :
@@ -133,33 +137,34 @@ function OrdersView() {
                                         'bg-gray-100 text-gray-600'
                                     }`}>{order.status}</span>
                                 </div>
-                                <p className="text-sm text-system-textSec">Consumer ID: {order.consumer_id}</p>
+                                <p className="text-sm text-system-textSec">{t('login.consumer')} ID: {order.consumer_id}</p>
                                 
                                 {/* Order Items */}
                                 <div className="mt-4 space-y-2">
                                     {order.items.map((item, idx) => (
                                         <div key={idx} className="flex justify-between text-sm bg-system-bg p-3 rounded-lg">
-                                            <span>Product #{item.product_id} × {item.quantity}</span>
-                                            <span className="font-medium">${(item.unit_price_at_time * item.quantity).toFixed(2)}</span>
+                                            <span>{t('common.products')} #{item.product_id} × {item.quantity}</span>
+                                            <span className="font-medium">₸{(item.unit_price_at_time * item.quantity).toFixed(2)}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                             
                             <div className="text-right">
-                                <p className="text-sm text-system-textSec mb-1">Total Amount</p>
-                                <p className="font-bold text-2xl text-system-text">${order.total_amount.toFixed(2)}</p>
+                                <p className="text-sm text-system-textSec mb-1">{t('supplier.totalAmount')}</p>
+                                <p className="font-bold text-2xl text-system-text">₸{order.total_amount.toFixed(2)}</p>
                             </div>
                         </div>
                     </div>
                 ))}
-                {orders.length === 0 && <p className="text-center py-10 text-system-textSec">No orders yet.</p>}
+                {orders.length === 0 && <p className="text-center py-10 text-system-textSec">{t('common.noOrdersYet')}</p>}
             </div>
         </div>
     );
 }
 
 function ComplaintsView() {
+    const { t } = useTranslation();
     const { user } = useApp();
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const navigate = useNavigate();
@@ -225,8 +230,8 @@ function ComplaintsView() {
     return (
         <div className="space-y-8 animate-in fade-in">
             <div>
-                <h2 className="text-2xl font-bold text-system-text tracking-tight">Complaint Management</h2>
-                <p className="text-system-textSec">Communicate with customers about their complaints via chat</p>
+                <h2 className="text-2xl font-bold text-system-text tracking-tight">{t('supplier.complaintManagement')}</h2>
+                <p className="text-system-textSec">{t('supplier.complaintManagementSubtitle')}</p>
             </div>
 
             {/* My Complaints - Currently Handling */}
@@ -234,20 +239,20 @@ function ComplaintsView() {
                 <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
                     <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
                         <span className="w-2 h-2 bg-system-green rounded-full"></span>
-                        My Complaints
+                        {t('supplier.myComplaintsHandling')}
                     </h3>
                     <div className="space-y-4">
                         {myComplaints.map(complaint => (
                             <div key={complaint.id} className="p-5 bg-green-50 rounded-2xl border border-green-200">
                                 <div className="flex justify-between items-start mb-3">
                                     <div>
-                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <span className="font-semibold text-system-text">{t('common.complaints')} #{complaint.id}</span>
                                         <p className="text-xs text-system-textSec mt-1">
-                                            Order #{complaint.order_id}
-                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                            {t('supplier.order')} #{complaint.order_id}
+                                            {complaint.created_by && ` • ${t('supplier.fromUser')} #${complaint.created_by}`}
                                             {complaint.handler_name && (
                                                 <span className="block mt-1 text-green-700 font-medium">
-                                                    Handling: {complaint.handler_name} ({complaint.handler_role})
+                                                    {t('supplier.handler')}: {complaint.handler_name} ({complaint.handler_role})
                                                 </span>
                                             )}
                                         </p>
@@ -257,19 +262,19 @@ function ComplaintsView() {
                                             onClick={() => handleReplyInChat(complaint)}
                                             className="bg-system-blue text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600"
                                         >
-                                            Reply in Chat
+                                            {t('supplier.replyInChat')}
                                         </button>
                                         <button
                                             onClick={() => handleResolve(complaint.id)}
                                             className="bg-system-green text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600"
                                         >
-                                            Resolve
+                                            {t('supplier.resolve')}
                                         </button>
                                         <button
                                             onClick={() => handleEscalate(complaint.id)}
                                             className="bg-system-red text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700"
                                         >
-                                            Escalate
+                                            {t('common.escalate')}
                                         </button>
                                     </div>
                                 </div>
@@ -285,17 +290,17 @@ function ComplaintsView() {
                 <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
                     <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
                         <span className="w-2 h-2 bg-system-blue rounded-full"></span>
-                        Unassigned Complaints
+                        {t('supplier.unassignedComplaints')}
                     </h3>
                     <div className="space-y-4">
                         {unassignedComplaints.map(complaint => (
                             <div key={complaint.id} className="p-5 bg-system-bg rounded-2xl border border-system-border/50">
                                 <div className="flex justify-between items-start mb-3">
                                     <div>
-                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <span className="font-semibold text-system-text">{t('common.complaints')} #{complaint.id}</span>
                                         <p className="text-xs text-system-textSec mt-1">
-                                            Order #{complaint.order_id}
-                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                            {t('supplier.order')} #{complaint.order_id}
+                                            {complaint.created_by && ` • ${t('supplier.fromUser')} #${complaint.created_by}`}
                                         </p>
                                     </div>
                                     <div className="flex gap-2">
@@ -303,19 +308,19 @@ function ComplaintsView() {
                                             onClick={() => handleReplyInChat(complaint)}
                                             className="bg-system-blue text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600"
                                         >
-                                            Reply in Chat
+                                            {t('supplier.replyInChat')}
                                         </button>
                                         <button
                                             onClick={() => handleResolve(complaint.id)}
                                             className="bg-system-green text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600"
                                         >
-                                            Resolve
+                                            {t('supplier.resolve')}
                                         </button>
                                         <button
                                             onClick={() => handleEscalate(complaint.id)}
                                             className="bg-system-red text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700"
                                         >
-                                            Escalate
+                                            {t('common.escalate')}
                                         </button>
                                     </div>
                                 </div>
@@ -331,26 +336,26 @@ function ComplaintsView() {
                 <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
                     <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
                         <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
-                        Being Handled by Other Sales Reps
+                        {t('supplier.beingHandledByOther')}
                     </h3>
                     <div className="space-y-4">
                         {otherAssignedComplaints.map(complaint => (
                             <div key={complaint.id} className="p-5 bg-yellow-50 rounded-2xl border border-yellow-200 opacity-75">
                                 <div className="flex justify-between items-start mb-3">
                                     <div>
-                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <span className="font-semibold text-system-text">{t('common.complaints')} #{complaint.id}</span>
                                         <p className="text-xs text-system-textSec mt-1">
-                                            Order #{complaint.order_id}
-                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                            {t('supplier.order')} #{complaint.order_id}
+                                            {complaint.created_by && ` • ${t('supplier.fromUser')} #${complaint.created_by}`}
                                             {complaint.handler_name && (
                                                 <span className="block mt-1 text-yellow-700 font-medium">
-                                                    Handler: {complaint.handler_name} ({complaint.handler_role})
+                                                    {t('supplier.handler')}: {complaint.handler_name} ({complaint.handler_role})
                                                 </span>
                                             )}
                                         </p>
                                     </div>
                                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-                                        {complaint.handler_role === 'SUPPLIER_SALES' ? 'Sales Rep' : 'Manager'}
+                                        {complaint.handler_role === 'SUPPLIER_SALES' ? t('login.supplierSales') : t('login.supplierManager')}
                                     </span>
                                 </div>
                                 <p className="text-sm text-system-text">{complaint.description}</p>
@@ -365,21 +370,21 @@ function ComplaintsView() {
                 <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
                     <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
                         <span className="w-2 h-2 bg-system-red rounded-full"></span>
-                        Escalated to Manager
+                        {t('supplier.escalatedToManager')}
                     </h3>
                     <div className="space-y-4">
                         {escalatedComplaints.map(complaint => (
                             <div key={complaint.id} className="p-5 bg-red-50 rounded-2xl border border-red-200">
                                 <div className="flex justify-between items-start mb-3">
                                     <div>
-                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <span className="font-semibold text-system-text">{t('common.complaints')} #{complaint.id}</span>
                                         <p className="text-xs text-system-textSec mt-1">
-                                            Order #{complaint.order_id}
-                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                            {t('supplier.order')} #{complaint.order_id}
+                                            {complaint.created_by && ` • ${t('supplier.fromUser')} #${complaint.created_by}`}
                                         </p>
                                     </div>
                                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                                        Awaiting Manager
+                                        {t('supplier.awaitingManager')}
                                     </span>
                                 </div>
                                 <p className="text-sm text-system-text">{complaint.description}</p>

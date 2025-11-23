@@ -181,7 +181,7 @@ function ConsumerCatalog() {
                             <div className="p-5">
                                 <div className="flex justify-between items-start mb-1">
                                     <h3 className="font-semibold text-system-text text-lg leading-tight">{product.name}</h3>
-                                    <p className="font-semibold text-system-text">${product.price.toFixed(2)}</p>
+                                    <p className="font-semibold text-system-text">₸{product.price.toFixed(2)}</p>
                                 </div>
                                 <p className="text-xs text-system-textSec mb-4 uppercase tracking-wide font-medium">{product.sku}</p>
                                 <button 
@@ -222,14 +222,14 @@ function ConsumerCatalog() {
                                     <div className="text-xs text-system-textSec">Qty: {item.quantity}</div>
                                 </div>
                             </div>
-                            <div className="font-medium text-sm text-system-text">${(item.price * item.quantity).toFixed(2)}</div>
+                            <div className="font-medium text-sm text-system-text">₸{(item.price * item.quantity).toFixed(2)}</div>
                             </div>
                         ))}
                         </div>
                         <div className="pt-4 border-t border-system-border">
                             <div className="flex justify-between items-center mb-6">
                                 <span className="text-system-textSec">Total</span>
-                                <span className="text-2xl font-bold text-system-text">${totalPrice.toFixed(2)}</span>
+                                <span className="text-2xl font-bold text-system-text">₸{totalPrice.toFixed(2)}</span>
                             </div>
                             <button 
                             onClick={handleCheckout}
@@ -301,7 +301,7 @@ function ConsumerOrders() {
                                 <p className="text-sm text-system-textSec">Supplier #{order.supplier_id} • {order.items.length} items</p>
                             </div>
                             <div className="text-right">
-                                <p className="font-bold text-xl text-system-text">${order.total_amount.toFixed(2)}</p>
+                                <p className="font-bold text-xl text-system-text">₸{order.total_amount.toFixed(2)}</p>
                                 {order.status !== 'CANCELLED' && order.status !== 'REJECTED' && (
                                     <button
                                         onClick={() => setShowComplaintForm(order.id)}
@@ -318,7 +318,7 @@ function ConsumerOrders() {
                             {order.items.map((item, idx) => (
                                 <div key={idx} className="flex justify-between text-sm bg-system-bg p-3 rounded-lg">
                                     <span>Product #{item.product_id} × {item.quantity}</span>
-                                    <span className="font-medium">${(item.unit_price_at_time * item.quantity).toFixed(2)}</span>
+                                    <span className="font-medium">₸{(item.unit_price_at_time * item.quantity).toFixed(2)}</span>
                                 </div>
                             ))}
                         </div>

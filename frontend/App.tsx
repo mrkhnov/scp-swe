@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { User, UserRole, CartItem } from './types';
 import { api, getUserFromToken, logout } from './services/api';
 import Login from './pages/Login';
@@ -7,6 +8,7 @@ import ConsumerDashboard from './pages/consumer/ConsumerDashboard';
 import SupplierDashboard from './pages/supplier/SupplierDashboard';
 import SalesRepDashboard from './pages/supplier/SalesRepDashboard';
 import ChatPage from './pages/ChatPage';
+import LanguageSwitcher from './components/LanguageSwitcher';
 
 // --- Global State Context ---
 interface AppContextType {
@@ -27,6 +29,7 @@ const LogoutIcon = () => (
 
 // --- Layout Component ---
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { t } = useTranslation();
   const { user, setUser, cart } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,7 +53,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           >
             {/* Minimalist Logo */}
             <div className="w-6 h-6 bg-system-text rounded-md flex items-center justify-center text-white text-xs font-bold">S</div>
-            <span className="font-semibold tracking-tight text-lg">Platform</span>
+            <span className="font-semibold tracking-tight text-lg">{t('common.platform')}</span>
           </div>
           
           {user && (
@@ -62,25 +65,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       onClick={() => navigate('/consumer')} 
                       className={`transition-colors hover:text-system-text ${isActive('/consumer') && !isActive('/consumer/suppliers') && !isActive('/consumer/orders') && !isActive('/consumer/complaints') ? 'text-system-text' : ''}`}
                     >
-                      Marketplace
+                      {t('nav.marketplace')}
                     </button>
                     <button 
                       onClick={() => navigate('/consumer/suppliers')} 
                       className={`transition-colors hover:text-system-text ${isActive('/consumer/suppliers') ? 'text-system-text' : ''}`}
                     >
-                      Suppliers
+                      {t('nav.suppliers')}
                     </button>
                     <button 
                       onClick={() => navigate('/consumer/orders')} 
                       className={`transition-colors hover:text-system-text ${isActive('/consumer/orders') ? 'text-system-text' : ''}`}
                     >
-                      Orders
+                      {t('nav.orders')}
                     </button>
                     <button 
                       onClick={() => navigate('/consumer/complaints')} 
                       className={`transition-colors hover:text-system-text ${isActive('/consumer/complaints') ? 'text-system-text' : ''}`}
                     >
-                      Complaints
+                      {t('nav.complaints')}
                     </button>
                   </>
                 ) : user.role === UserRole.SUPPLIER_SALES ? (
@@ -89,19 +92,19 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       onClick={() => navigate('/sales')} 
                       className={`transition-colors hover:text-system-text ${isActive('/sales') && !isActive('/sales/orders') && !isActive('/sales/complaints') ? 'text-system-text' : ''}`}
                     >
-                      Dashboard
+                      {t('nav.dashboard')}
                     </button>
                     <button 
                       onClick={() => navigate('/sales/orders')} 
                       className={`transition-colors hover:text-system-text ${isActive('/sales/orders') ? 'text-system-text' : ''}`}
                     >
-                      Orders
+                      {t('nav.orders')}
                     </button>
                     <button 
                       onClick={() => navigate('/sales/complaints')} 
                       className={`transition-colors hover:text-system-text ${isActive('/sales/complaints') ? 'text-system-text' : ''}`}
                     >
-                      Complaints
+                      {t('nav.complaints')}
                     </button>
                   </>
                 ) : (user.role === UserRole.SUPPLIER_OWNER || user.role === UserRole.SUPPLIER_MANAGER) ? (
@@ -114,12 +117,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => navigate('/chat')} 
                     className={`transition-colors hover:text-system-text ${isChat ? 'text-system-blue font-semibold' : ''}`}
                   >
-                    Messages
+                    {t('nav.messages')}
                   </button>
                 )}
               </nav>
               
               <div className="flex items-center space-x-4 pl-4 border-l border-system-border">
+                <LanguageSwitcher />
                 <div className="text-right hidden sm:block">
                   <div className="text-xs font-medium text-system-text">{user.email}</div>
                   <div className="text-[10px] text-system-textSec uppercase tracking-wider">

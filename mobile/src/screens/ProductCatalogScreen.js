@@ -98,7 +98,7 @@ export default function ProductCatalogScreen({ navigation }) {
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{item.name}</Text>
           <Text style={styles.productSku}>SKU: {item.sku}</Text>
-          <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+          <Text style={styles.productPrice}>₸{item.price.toFixed(2)}</Text>
           <Text style={styles.productStock}>
             Stock: {item.stock_quantity} | Min Order: {item.min_order_qty}
           </Text>

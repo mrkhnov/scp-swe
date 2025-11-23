@@ -1,33 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, NavLink as RouterNavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api, resolveImageUrl } from '../../services/api';
 import { Link, LinkStatus, Order, OrderStatus, Product, UserRole, Complaint, ComplaintStatus, Company, Connection, BlacklistEntry } from '../../types';
 import { useApp } from '../../App';
+import LanguageSwitcher from '../../components/LanguageSwitcher';
 
 const panelBase = 'rounded-3xl border border-system-border/40 bg-white/90 backdrop-blur-md shadow-[0_28px_80px_-36px_rgba(15,23,42,0.45)]';
 const panelPadding = 'p-6 md:p-8';
 const panelClass = `${panelBase} ${panelPadding}`;
 
 const supplierNavItems = [
-    { label: 'Overview', to: '/supplier', exact: true },
-    { label: 'Catalog', to: '/supplier/products' },
-    { label: 'Orders', to: '/supplier/orders' },
-    { label: 'Complaints', to: '/supplier/complaints' },
-    { label: 'Team', to: '/supplier/team' },
-    { label: 'Connections', to: '/supplier/connections' },
-    { label: 'Settings', to: '/supplier/settings' },
+    { key: 'supplier.overview', to: '/supplier', exact: true },
+    { key: 'common.products', to: '/supplier/products' },
+    { key: 'common.orders', to: '/supplier/orders' },
+    { key: 'common.complaints', to: '/supplier/complaints' },
+    { key: 'supplier.team', to: '/supplier/team' },
+    { key: 'supplier.connections', to: '/supplier/connections' },
+    { key: 'common.settings', to: '/supplier/settings' },
 ];
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: 'USD',
+        currency: 'KZT',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-    }).format(value);
+    }).format(value).replace('KZT', '₸');
 };
 
 export default function SupplierDashboard() {
+    const { t } = useTranslation();
     const { user, setUser } = useApp();
     const navigate = useNavigate();
 
@@ -40,7 +43,7 @@ export default function SupplierDashboard() {
     // Filter nav items based on user role
     const visibleNavItems = supplierNavItems.filter(item => {
         // Only show Team for owners
-        if (item.label === 'Team' && user?.role !== UserRole.SUPPLIER_OWNER) {
+        if (item.key === 'supplier.team' && user?.role !== UserRole.SUPPLIER_OWNER) {
             return false;
         }
         return true;
@@ -53,13 +56,13 @@ export default function SupplierDashboard() {
                 <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 md:px-8">
                     <div className="flex items-center gap-6">
                         <div>
-                            <h2 className="text-lg font-semibold text-system-text">Supplier Dashboard</h2>
-                            <p className="text-xs text-system-textSec hidden sm:block">Control Center</p>
+                            <h2 className="text-lg font-semibold text-system-text">{t('common.dashboard')}</h2>
+                            <p className="text-xs text-system-textSec hidden sm:block">{t('supplier.controlCenter')}</p>
                         </div>
                         <nav className="flex items-center gap-1">
                             {visibleNavItems.map(item => (
                                 <RouterNavLink
-                                    key={item.label}
+                                    key={item.key}
                                     to={item.to}
                                     end={item.exact}
                                     className={({ isActive }) =>
@@ -70,12 +73,13 @@ export default function SupplierDashboard() {
                                         }`
                                     }
                                 >
-                                    {item.label}
+                                    {t(item.key)}
                                 </RouterNavLink>
                             ))}
                         </nav>
                     </div>
                     <div className="flex items-center gap-3">
+                        <LanguageSwitcher />
                         <div className="text-right hidden md:block">
                             <div className="text-xs font-medium text-system-text">{user?.email}</div>
                             <div className="text-[10px] text-system-textSec uppercase tracking-wider">
@@ -87,7 +91,7 @@ export default function SupplierDashboard() {
                             className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100"
                             title="Logout"
                         >
-                            Logout
+                            {t('common.logout')}
                         </button>
                     </div>
                 </div>
@@ -96,9 +100,9 @@ export default function SupplierDashboard() {
             {/* Main Content */}
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 md:px-8">
                 <header className="text-center">
-                    <h1 className="text-3xl font-bold text-system-text tracking-tight">Supplier Control Center</h1>
+                    <h1 className="text-3xl font-bold text-system-text tracking-tight">{t('supplier.dashboardTitle')}</h1>
                     <p className="mt-2 max-w-2xl mx-auto text-sm text-system-textSec">
-                        Monitor relationships, track orders, and keep your catalog humming—all in one modern workspace.
+                        {t('supplier.dashboardSubtitle')}
                     </p>
                 </header>
 
@@ -142,6 +146,7 @@ function PageHero({ title, subtitle, actions }: PageHeroProps) {
 }
 
 function Overview() {
+    const { t } = useTranslation();
     const [links, setLinks] = useState<Link[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
@@ -212,24 +217,24 @@ function Overview() {
 
     const statCards = [
         {
-            label: 'Active Consumers',
+            label: t('supplier.activeConsumers'),
             value: activeLinks.length.toLocaleString(),
-            caption: 'Approved connections currently trading'
+            caption: t('supplier.activeConsumersCaption')
         },
         {
-            label: 'Open Orders',
+            label: t('supplier.openOrders'),
             value: pipelineOrders.length.toLocaleString(),
-            caption: 'Pending, accepted, or in delivery'
+            caption: t('supplier.openOrdersCaption')
         },
         {
-            label: 'Revenue (lifetime)',
+            label: t('supplier.revenueLifetime'),
             value: formatCurrency(totalRevenue),
-            caption: `${completedOrders.length} completed orders`
+            caption: t('supplier.completedOrdersCaption', { count: completedOrders.length })
         },
         {
-            label: 'Catalog Items',
+            label: t('supplier.catalogItems'),
             value: products.length.toLocaleString(),
-            caption: outOfStock ? `${outOfStock} out of stock` : 'All items available'
+            caption: outOfStock ? t('supplier.outOfStock', { count: outOfStock }) : t('supplier.allItemsAvailable')
         },
     ];
 
@@ -254,12 +259,12 @@ function Overview() {
     return (
         <div className="space-y-10 animate-in fade-in">
             <PageHero
-                title="Daily Pulse"
-                subtitle="A real-time snapshot of revenue, relationships, and fulfillment performance."
+                title={t('supplier.dailyPulse')}
+                subtitle={t('supplier.dailyPulseSubtitle')}
                 actions={
                     <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold">
                         <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
-                        {pipelineOrders.length} orders in motion
+                        {t('supplier.ordersInMotion', { count: pipelineOrders.length })}
                     </div>
                 }
             />
@@ -282,36 +287,36 @@ function Overview() {
                 <div className={`${panelClass} space-y-6`}>
                     <div className="flex items-center justify-between">
                         <div>
-                            <h3 className="text-lg font-semibold text-system-text">Pending Connection Requests</h3>
-                            <p className="text-sm text-system-textSec">Review and respond to new consumer invitations.</p>
+                            <h3 className="text-lg font-semibold text-system-text">{t('supplier.pendingConnectionRequests')}</h3>
+                            <p className="text-sm text-system-textSec">{t('supplier.pendingConnectionRequestsSubtitle')}</p>
                         </div>
                         <span className="rounded-full bg-system-blue/10 px-3 py-1 text-xs font-semibold text-system-blue">{pendingLinks.length}</span>
                     </div>
 
                     {pendingLinks.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-system-border/70 bg-system-bg px-6 py-10 text-center text-sm text-system-textSec">
-                            All caught up. New connection requests will show up here.
+                            {t('supplier.noPendingRequests')}
                         </div>
                     ) : (
                         <div className="space-y-4">
                             {pendingLinks.map(link => (
                                 <div key={link.id} className="flex flex-col gap-4 rounded-2xl border border-system-border/70 bg-system-bg p-4 md:flex-row md:items-center md:justify-between">
                                     <div>
-                                        <p className="font-semibold text-system-text">Consumer #{link.consumer_id}</p>
-                                        <p className="text-xs text-system-textSec">Request ID: {link.id}</p>
+                                        <p className="font-semibold text-system-text">{t('supplier.consumer')} #{link.consumer_id}</p>
+                                        <p className="text-xs text-system-textSec">{t('supplier.requestId')}: {link.id}</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <button
                                             className="rounded-full bg-system-text px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-black"
                                             onClick={() => handleStatusChange(link.id, LinkStatus.APPROVED)}
                                         >
-                                            Approve
+                                            {t('supplier.approve')}
                                         </button>
                                         <button
                                             className="rounded-full border border-red-200 bg-white px-4 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
                                             onClick={() => handleStatusChange(link.id, LinkStatus.REJECTED)}
                                         >
-                                            Reject
+                                            {t('supplier.reject')}
                                         </button>
                                     </div>
                                 </div>
@@ -323,28 +328,28 @@ function Overview() {
                 <div className={`${panelClass} space-y-6`}>
                     <div className="flex items-center justify-between">
                         <div>
-                            <h3 className="text-lg font-semibold text-system-text">Order Pipeline</h3>
-                            <p className="text-sm text-system-textSec">Track orders through acceptance, delivery, and completion.</p>
+                            <h3 className="text-lg font-semibold text-system-text">{t('supplier.orderPipeline')}</h3>
+                            <p className="text-sm text-system-textSec">{t('supplier.orderPipelineSubtitle')}</p>
                         </div>
                         <RouterNavLink
                             to="/supplier/orders"
                             className="text-xs font-semibold text-system-blue transition-colors hover:text-blue-600"
                         >
-                            View all orders →
+                            {t('supplier.viewAllOrders')} →
                         </RouterNavLink>
                     </div>
 
                     {pipelineOrders.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-system-border/70 bg-system-bg px-6 py-10 text-center text-sm text-system-textSec">
-                            No orders in progress. Completed and rejected orders live in the orders tab.
+                            {t('supplier.noOrdersInProgress')}
                         </div>
                     ) : (
                         <div className="space-y-4">
                             {pipelineOrders.slice(0, 4).map(order => (
                                 <div key={order.id} className="flex flex-col gap-3 rounded-2xl border border-system-border/70 bg-system-bg p-4 md:flex-row md:items-center md:justify-between">
                                     <div className="space-y-1">
-                                        <p className="font-semibold text-system-text">Order #{order.id}</p>
-                                        <p className="text-xs text-system-textSec">Consumer #{order.consumer_id} • {order.items.length} items</p>
+                                        <p className="font-semibold text-system-text">{t('supplier.order')} #{order.id}</p>
+                                        <p className="text-xs text-system-textSec">{t('supplier.consumer')} #{order.consumer_id} • {order.items.length} {t('supplier.items')}</p>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${orderStatusStyles(order.status)}`}>
@@ -362,14 +367,14 @@ function Overview() {
             <div className={`${panelClass} space-y-6`}>
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h3 className="text-lg font-semibold text-system-text">Inventory Signals</h3>
-                        <p className="text-sm text-system-textSec">Watch stock levels and keep best sellers available.</p>
+                        <h3 className="text-lg font-semibold text-system-text">{t('supplier.inventorySignals')}</h3>
+                        <p className="text-sm text-system-textSec">{t('supplier.inventorySignalsSubtitle')}</p>
                     </div>
                     <RouterNavLink
                         to="/supplier/products"
                         className="text-xs font-semibold text-system-blue transition-colors hover:text-blue-600"
                     >
-                        Manage products →
+                        {t('supplier.manageProducts')} →
                     </RouterNavLink>
                 </div>
 
@@ -383,7 +388,7 @@ function Overview() {
                     <div className="grid gap-4 md:grid-cols-2">
                         {lowStockProducts.length === 0 ? (
                             <div className="col-span-full rounded-2xl border border-dashed border-system-border/70 bg-system-bg px-6 py-8 text-center text-sm text-system-textSec">
-                                Stock levels look healthy. We will highlight low inventory items here.
+                                {t('supplier.stockHealthy')}
                             </div>
                         ) : (
                             lowStockProducts.map(product => (
@@ -397,9 +402,9 @@ function Overview() {
                                     </div>
                                     <div>
                                         <p className="font-semibold text-system-text">{product.name}</p>
-                                        <p className="text-xs text-system-textSec">SKU {product.sku}</p>
+                                        <p className="text-xs text-system-textSec">{t('supplier.sku')} {product.sku}</p>
                                         <p className="mt-1 text-xs font-semibold text-system-red">
-                                            {product.stock_quantity} in stock • Min order {product.min_order_qty}
+                                            {product.stock_quantity} {t('supplier.inStock')} • {t('supplier.minOrder')} {product.min_order_qty}
                                         </p>
                                     </div>
                                 </div>
@@ -411,8 +416,8 @@ function Overview() {
                 <div className="rounded-2xl border border-system-border/50 bg-system-bg p-6 text-sm text-system-textSec">
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
-                            <p className="font-semibold text-system-text">Average order value</p>
-                            <p className="text-sm text-system-textSec">Completed orders only</p>
+                            <p className="font-semibold text-system-text">{t('supplier.averageOrderValue')}</p>
+                            <p className="text-sm text-system-textSec">{t('supplier.completedOrdersOnly')}</p>
                         </div>
                         <p className="text-2xl font-semibold text-system-text">{averageOrderValue ? formatCurrency(averageOrderValue) : '—'}</p>
                     </div>
@@ -423,6 +428,7 @@ function Overview() {
 }
 
 function Inventory() {
+    const { t } = useTranslation();
     const { user } = useApp();
     const [products, setProducts] = useState<Product[]>([]);
     const canEdit = user?.role === UserRole.SUPPLIER_OWNER || user?.role === UserRole.SUPPLIER_MANAGER;
@@ -519,6 +525,19 @@ function Inventory() {
         }
     };
 
+    const handleDelete = async (productId: number) => {
+        if (!canEdit) return;
+        if (!window.confirm(t('supplier.confirmDeleteProduct'))) return;
+
+        try {
+            await api.deleteProduct(productId);
+            setProducts(await api.getProducts());
+            alert(t('supplier.productDeleted'));
+        } catch (error: any) {
+            alert('Failed to delete product: ' + (error.message || 'Unknown error'));
+        }
+    };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setImageFile(e.target.files[0]);
@@ -538,12 +557,12 @@ function Inventory() {
     return (
         <div className="space-y-10 animate-in fade-in">
             <PageHero
-                title="Catalog Management"
-                subtitle="Launch new SKUs, curate your assortment, and keep inventory aligned with demand."
+                title={t('supplier.catalogManagement')}
+                subtitle={t('supplier.catalogManagementSubtitle')}
                 actions={
                     <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-600">
                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                        {products.filter(p => p.is_active).length} live products
+                        {t('supplier.liveProducts', { count: products.filter(p => p.is_active).length })}
                     </div>
                 }
             />
@@ -551,13 +570,13 @@ function Inventory() {
             {canEdit && (
                 <div className={`${panelClass} space-y-6`}>
                     <div>
-                        <h3 className="text-xl font-semibold text-system-text">Add New Product</h3>
-                        <p className="text-sm text-system-textSec">Create a listing with pricing, availability, and imagery in one step.</p>
+                        <h3 className="text-xl font-semibold text-system-text">{t('supplier.addNewProduct')}</h3>
+                        <p className="text-sm text-system-textSec">{t('supplier.addNewProductSubtitle')}</p>
                     </div>
                     <form onSubmit={handleCreate} className="space-y-6">
                         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase text-system-textSec">Product Name</label>
+                                <label className="text-xs font-semibold uppercase text-system-textSec">{t('supplier.productName')}</label>
                                 <input
                                     className="w-full rounded-2xl border border-system-border/60 bg-system-bg px-4 py-3 text-sm outline-none transition focus:border-system-blue focus:ring-2 focus:ring-system-blue/20"
                                     value={newProd.name}
@@ -566,7 +585,7 @@ function Inventory() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase text-system-textSec">SKU</label>
+                                <label className="text-xs font-semibold uppercase text-system-textSec">{t('supplier.sku')}</label>
                                 <input
                                     className="w-full rounded-2xl border border-system-border/60 bg-system-bg px-4 py-3 text-sm outline-none transition focus:border-system-blue focus:ring-2 focus:ring-system-blue/20"
                                     value={newProd.sku}
@@ -575,7 +594,7 @@ function Inventory() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase text-system-textSec">Price ($)</label>
+                                <label className="text-xs font-semibold uppercase text-system-textSec">{t('common.price')} (₸)</label>
                                 <input
                                     type="number"
                                     className="w-full rounded-2xl border border-system-border/60 bg-system-bg px-4 py-3 text-sm outline-none transition focus:border-system-blue focus:ring-2 focus:ring-system-blue/20"
@@ -588,7 +607,7 @@ function Inventory() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase text-system-textSec">Stock</label>
+                                <label className="text-xs font-semibold uppercase text-system-textSec">{t('supplier.stock')}</label>
                                 <input
                                     type="number"
                                     className="w-full rounded-2xl border border-system-border/60 bg-system-bg px-4 py-3 text-sm outline-none transition focus:border-system-blue focus:ring-2 focus:ring-system-blue/20"
@@ -601,7 +620,7 @@ function Inventory() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase text-system-textSec">Minimum Order Qty</label>
+                                <label className="text-xs font-semibold uppercase text-system-textSec">{t('supplier.minOrderQty')}</label>
                                 <input
                                     type="number"
                                     className="w-full rounded-2xl border border-system-border/60 bg-system-bg px-4 py-3 text-sm outline-none transition focus:border-system-blue focus:ring-2 focus:ring-system-blue/20"
@@ -615,18 +634,18 @@ function Inventory() {
                                 />
                             </div>
                             <div className="md:col-span-2 space-y-2">
-                                <label className="text-xs font-semibold uppercase text-system-textSec">Product Image</label>
+                                <label className="text-xs font-semibold uppercase text-system-textSec">{t('supplier.productImage')}</label>
                                 <input
                                     type="file"
                                     accept="image/*"
                                     onChange={handleFileChange}
                                     className="block w-full text-sm text-system-textSec file:mr-4 file:rounded-full file:border-0 file:bg-system-blue/10 file:px-5 file:py-2 file:font-semibold file:text-system-blue hover:file:bg-system-blue/20"
                                 />
-                                {imageFile && <p className="text-xs text-system-textSec">Selected: {imageFile.name}</p>}
+                                {imageFile && <p className="text-xs text-system-textSec">{t('supplier.selected')}: {imageFile.name}</p>}
                             </div>
                         </div>
                         <div className="flex justify-end">
-                            <button type="submit" className="rounded-xl bg-system-text px-8 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black">Add Product</button>
+                            <button type="submit" className="rounded-xl bg-system-text px-8 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black">{t('supplier.addProduct')}</button>
                         </div>
                     </form>
                 </div>
@@ -634,20 +653,20 @@ function Inventory() {
 
             <div className={`${panelBase} overflow-hidden`}>
                 <div className="border-b border-system-border/60 bg-system-bg/60 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-system-text md:px-8">
-                    Product Catalog
+                    {t('supplier.productCatalog')}
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[800px] text-left text-sm">
                         <thead>
                             <tr>
-                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">Image</th>
-                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">SKU</th>
-                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">Name</th>
-                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">Price</th>
-                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">Stock</th>
-                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">Status</th>
-                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">Min Order</th>
-                                {canEdit && <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">Actions</th>}
+                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">{t('supplier.image')}</th>
+                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">{t('supplier.sku')}</th>
+                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">{t('supplier.name')}</th>
+                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">{t('common.price')}</th>
+                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">{t('supplier.stock')}</th>
+                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">{t('common.status')}</th>
+                                <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">{t('supplier.minOrder')}</th>
+                                {canEdit && <th className="px-6 py-4 text-xs font-semibold uppercase text-system-textSec md:px-8">{t('supplier.actions')}</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-system-border/40">
@@ -668,7 +687,7 @@ function Inventory() {
                                                     onChange={handleEditFileChange}
                                                     className="block text-xs text-system-textSec file:mr-2 file:rounded-full file:border-0 file:bg-system-blue/10 file:px-4 file:py-1.5 file:text-system-blue hover:file:bg-system-blue/20"
                                                 />
-                                                {editImageFile && <p className="text-[10px] text-system-textSec">New file: {editImageFile.name}</p>}
+                                                {editImageFile && <p className="text-[10px] text-system-textSec">{t('common.newFile')}: {editImageFile.name}</p>}
                                             </div>
                                         </td>
                                         <td className="px-6 py-5 font-mono text-xs text-system-textSec md:px-8">{product.sku}</td>
@@ -704,10 +723,10 @@ function Inventory() {
                                         </td>
                                         <td className="px-6 py-5 md:px-8">
                                             <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
-                                                (editForm.stock_quantity ?? 0) > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-system-textSec'
+                                                (editForm.stock_quantity ?? 0) > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-600'
                                             }`}>
                                                 <span className={`h-2 w-2 rounded-full ${(editForm.stock_quantity ?? 0) > 0 ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                                {(editForm.stock_quantity ?? 0) > 0 ? 'Will be Active' : 'Will be Inactive'}
+                                                {(editForm.stock_quantity ?? 0) > 0 ? t('supplier.willBeActive') : t('supplier.willBeInactive')}
                                             </span>
                                         </td>
                                         <td className="px-6 py-5 md:px-8">
@@ -724,8 +743,8 @@ function Inventory() {
                                         </td>
                                         <td className="px-6 py-5 md:px-8">
                                             <div className="flex gap-2">
-                                                <button onClick={() => handleSaveEdit(product.id)} className="rounded-xl bg-system-green px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-green-600">Save</button>
-                                                <button onClick={handleCancelEdit} className="rounded-xl bg-system-textSec px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-600">Cancel</button>
+                                                <button onClick={() => handleSaveEdit(product.id)} className="rounded-xl bg-system-green px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-green-600">{t('common.save')}</button>
+                                                <button onClick={handleCancelEdit} className="rounded-xl bg-system-textSec px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-600">{t('common.cancel')}</button>
                                             </div>
                                         </td>
                                     </>
@@ -740,20 +759,23 @@ function Inventory() {
                                         </td>
                                         <td className="px-6 py-5 font-mono text-xs text-system-textSec md:px-8">{product.sku}</td>
                                         <td className="px-6 py-5 font-semibold text-system-text md:px-8">{product.name}</td>
-                                        <td className="px-6 py-5 text-system-text md:px-8">${product.price.toFixed(2)}</td>
+                                        <td className="px-6 py-5 text-system-text md:px-8">₸{product.price.toFixed(2)}</td>
                                         <td className="px-6 py-5 text-system-text md:px-8">{product.stock_quantity}</td>
                                         <td className="px-6 py-5 md:px-8">
                                             <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
                                                 product.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-system-textSec'
                                             }`}>
                                                 <span className={`h-2 w-2 rounded-full ${product.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                                {product.is_active ? 'Active' : 'Inactive'}
+                                                {product.is_active ? t('supplier.active') : t('supplier.inactive')}
                                             </span>
                                         </td>
                                         <td className="px-6 py-5 text-system-text md:px-8">{product.min_order_qty ?? '—'}</td>
                                         {canEdit && (
                                             <td className="px-6 py-5 md:px-8">
-                                                <button onClick={() => handleEdit(product)} className="text-sm font-semibold text-system-blue transition-colors hover:text-blue-600">Edit</button>
+                                                <div className="flex gap-3">
+                                                    <button onClick={() => handleEdit(product)} className="text-sm font-semibold text-system-blue transition-colors hover:text-blue-600">{t('common.edit')}</button>
+                                                    <button onClick={() => handleDelete(product.id)} className="text-sm font-semibold text-red-500 transition-colors hover:text-red-600">{t('common.delete')}</button>
+                                                </div>
                                             </td>
                                         )}
                                     </>
@@ -763,7 +785,7 @@ function Inventory() {
                         {products.length === 0 && (
                             <tr>
                                 <td colSpan={canEdit ? 8 : 7} className="px-6 py-12 text-center text-sm text-system-textSec md:px-8">
-                                    No products yet. Create your first catalog item above.
+                                    {t('supplier.noProductsYet')}
                                 </td>
                             </tr>
                         )}
@@ -775,6 +797,7 @@ function Inventory() {
     );
 }
 function OrderManagement() {
+    const { t } = useTranslation();
     const [orders, setOrders] = useState<Order[]>([]);
 
     useEffect(() => {
@@ -797,14 +820,14 @@ function OrderManagement() {
 
     return (
         <div className="space-y-8 animate-in fade-in">
-            <h2 className="text-2xl font-bold text-system-text tracking-tight">Incoming Orders</h2>
+            <h2 className="text-2xl font-bold text-system-text tracking-tight">{t('supplier.incomingOrders')}</h2>
             <div className="space-y-4">
                 {orders.map(order => (
                     <div key={order.id} className="bg-white p-6 rounded-3xl shadow-card border border-system-border/50 hover:shadow-lg transition-shadow">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div>
                                 <div className="flex items-center gap-3 mb-2">
-                                    <span className="font-bold text-lg text-system-text">Order #{order.id}</span>
+                                    <span className="font-bold text-lg text-system-text">{t('supplier.order')} #{order.id}</span>
                                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                                          order.status === OrderStatus.PENDING ? 'bg-system-blue/10 text-system-blue' :
                                          order.status === OrderStatus.ACCEPTED ? 'bg-system-green/10 text-system-green' :
@@ -815,11 +838,11 @@ function OrderManagement() {
                                          'bg-gray-100 text-gray-600'
                                     }`}>{order.status}</span>
                                 </div>
-                                <p className="text-sm text-system-textSec">Consumer ID: {order.consumer_id} • {order.items.length} items</p>
+                                <p className="text-sm text-system-textSec">{t('supplier.consumer')} ID: {order.consumer_id} • {order.items.length} {t('supplier.items')}</p>
                             </div>
                             
                             <div className="text-right">
-                                <p className="font-bold text-xl text-system-text mb-3">${order.total_amount.toFixed(2)}</p>
+                                <p className="font-bold text-xl text-system-text">₸{order.total_amount.toFixed(2)}</p>
                                 <div className="flex gap-3">
                                     {order.status === OrderStatus.PENDING && (
                                         <>
@@ -827,13 +850,13 @@ function OrderManagement() {
                                                 onClick={() => handleOrder(order.id, OrderStatus.ACCEPTED)}
                                                 className="bg-system-text text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-black"
                                             >
-                                                Accept
+                                                {t('supplier.accept')}
                                             </button>
                                             <button 
                                                 onClick={() => handleOrder(order.id, OrderStatus.REJECTED)}
                                                 className="bg-white border border-system-border text-system-red px-5 py-2 rounded-full text-sm font-medium hover:bg-red-50"
                                             >
-                                                Reject
+                                                {t('supplier.reject')}
                                             </button>
                                         </>
                                     )}
@@ -842,7 +865,7 @@ function OrderManagement() {
                                             onClick={() => handleOrder(order.id, OrderStatus.IN_DELIVERY)}
                                             className="bg-system-blue text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-600"
                                         >
-                                            Ship Order
+                                            {t('supplier.shipOrder')}
                                         </button>
                                     )}
                                     {order.status === OrderStatus.IN_DELIVERY && (
@@ -850,7 +873,7 @@ function OrderManagement() {
                                             onClick={() => handleOrder(order.id, OrderStatus.COMPLETED)}
                                             className="bg-system-green text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-green-600"
                                         >
-                                            Complete Order
+                                            {t('supplier.completeOrder')}
                                         </button>
                                     )}
                                 </div>
@@ -858,13 +881,14 @@ function OrderManagement() {
                         </div>
                     </div>
                 ))}
-                {orders.length === 0 && <p className="text-center py-10 text-system-textSec">No orders yet.</p>}
+                {orders.length === 0 && <p className="text-center py-10 text-system-textSec">{t('supplier.noOrdersYet')}</p>}
             </div>
         </div>
     );
 }
 
 function TeamManagement() {
+    const { t } = useTranslation();
     const { user } = useApp();
     const [companyUsers, setCompanyUsers] = useState<any[]>([]);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -877,8 +901,8 @@ function TeamManagement() {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-system-textSec">
                 <span className="text-4xl mb-4">🚫</span>
-                <h2 className="text-xl font-semibold text-system-text">Access Denied</h2>
-                <p className="mt-2">Only Supplier Owners can manage team members.</p>
+                <h2 className="text-xl font-semibold text-system-text">{t('supplier.accessDenied')}</h2>
+                <p className="mt-2">{t('supplier.accessDeniedMessage')}</p>
             </div>
         );
     }
@@ -928,9 +952,9 @@ function TeamManagement() {
 
     const getRoleDisplayName = (role: UserRole) => {
         switch (role) {
-            case UserRole.SUPPLIER_OWNER: return 'Owner';
-            case UserRole.SUPPLIER_MANAGER: return 'Manager';
-            case UserRole.SUPPLIER_SALES: return 'Sales Rep';
+            case UserRole.SUPPLIER_OWNER: return t('login.supplierOwner');
+            case UserRole.SUPPLIER_MANAGER: return t('login.supplierManager');
+            case UserRole.SUPPLIER_SALES: return t('login.supplierSales');
             default: return role;
         }
     };
@@ -939,14 +963,14 @@ function TeamManagement() {
         <div className="space-y-8 animate-in fade-in">
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold text-system-text tracking-tight">Team Management</h2>
-                    <p className="text-system-textSec">Manage your company's team members</p>
+                    <h2 className="text-2xl font-bold text-system-text tracking-tight">{t('supplier.teamManagement')}</h2>
+                    <p className="text-system-textSec">{t('supplier.teamManagementSubtitle')}</p>
                 </div>
                 <button
                     onClick={() => setShowAddForm(true)}
                     className="bg-system-text text-white px-6 py-3 rounded-xl font-medium hover:bg-black transition-colors"
                 >
-                    Add Team Member
+                    {t('supplier.addTeamMember')}
                 </button>
             </div>
 
@@ -959,11 +983,11 @@ function TeamManagement() {
             {/* Add User Form */}
             {showAddForm && (
                 <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
-                    <h3 className="text-lg font-semibold text-system-text mb-6">Add New Team Member</h3>
+                    <h3 className="text-lg font-semibold text-system-text mb-6">{t('supplier.addNewTeamMember')}</h3>
                     <form onSubmit={handleAddUser} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">Email</label>
+                                <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">{t('login.email')}</label>
                                 <input
                                     type="email"
                                     required
@@ -974,7 +998,7 @@ function TeamManagement() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">Password</label>
+                                <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">{t('login.password')}</label>
                                 <input
                                     type="password"
                                     required
@@ -986,14 +1010,14 @@ function TeamManagement() {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">Role</label>
+                            <label className="block text-xs font-semibold text-system-textSec uppercase tracking-wide mb-2">{t('login.role')}</label>
                             <select
                                 className="w-full px-4 py-3 bg-system-bg border-0 rounded-xl text-system-text outline-none focus:ring-2 focus:ring-system-blue"
                                 value={newUser.role}
                                 onChange={e => setNewUser({ ...newUser, role: e.target.value as UserRole })}
                             >
-                                <option value={UserRole.SUPPLIER_MANAGER}>Manager</option>
-                                <option value={UserRole.SUPPLIER_SALES}>Sales Rep</option>
+                                <option value={UserRole.SUPPLIER_MANAGER}>{t('login.supplierManager')}</option>
+                                <option value={UserRole.SUPPLIER_SALES}>{t('login.supplierSales')}</option>
                             </select>
                         </div>
                         <div className="flex gap-4">
@@ -1002,7 +1026,7 @@ function TeamManagement() {
                                 disabled={loading}
                                 className="bg-system-text text-white px-6 py-3 rounded-xl font-medium hover:bg-black transition-colors disabled:opacity-50"
                             >
-                                {loading ? 'Adding...' : 'Add User'}
+                                {loading ? t('supplier.adding') : t('supplier.addUser')}
                             </button>
                             <button
                                 type="button"
@@ -1013,7 +1037,7 @@ function TeamManagement() {
                                 }}
                                 className="bg-white border border-system-border text-system-textSec px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors"
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                         </div>
                     </form>
@@ -1023,7 +1047,7 @@ function TeamManagement() {
             {/* Team Members List */}
             <div className="bg-white rounded-3xl shadow-card border border-system-border/50 overflow-hidden">
                 <div className="p-6 border-b border-system-border">
-                    <h3 className="text-lg font-semibold text-system-text">Current Team Members</h3>
+                    <h3 className="text-lg font-semibold text-system-text">{t('supplier.currentTeamMembers')}</h3>
                 </div>
                 <div className="divide-y divide-system-border/50">
                     {companyUsers.map(teamUser => (
@@ -1043,14 +1067,14 @@ function TeamManagement() {
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                                     teamUser.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                                 }`}>
-                                    {teamUser.is_active ? 'Active' : 'Inactive'}
+                                    {teamUser.is_active ? t('supplier.active') : t('supplier.inactive')}
                                 </span>
                                 {teamUser.role !== UserRole.SUPPLIER_OWNER && (
                                     <button
                                         onClick={() => handleRemoveUser(teamUser.id, teamUser.email)}
                                         className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
                                     >
-                                        Remove
+                                        {t('supplier.remove')}
                                     </button>
                                 )}
                             </div>
@@ -1060,7 +1084,7 @@ function TeamManagement() {
                 {companyUsers.length === 0 && (
                     <div className="p-12 text-center text-system-textSec">
                         <span className="text-4xl mb-4 block">👥</span>
-                        <p>No team members yet. Add some to get started!</p>
+                        <p>{t('supplier.noTeamMembers')}</p>
                     </div>
                 )}
             </div>
@@ -1069,6 +1093,7 @@ function TeamManagement() {
 }
 
 function ComplaintsManagement() {
+    const { t } = useTranslation();
     const { user } = useApp();
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1106,16 +1131,16 @@ function ComplaintsManagement() {
     const escalatedComplaints = complaints.filter(c => c.status === ComplaintStatus.ESCALATED);
     const allComplaints = complaints.filter(c => c.status !== ComplaintStatus.ESCALATED);
 
-    if (loading) return <div>Loading complaints...</div>;
+    if (loading) return <div>{t('common.loading')}</div>;
 
     return (
         <div className="space-y-8 animate-in fade-in">
             <div>
-                <h2 className="text-2xl font-bold text-system-text tracking-tight">Complaint Management</h2>
+                <h2 className="text-2xl font-bold text-system-text tracking-tight">{t('supplier.complaintManagement')}</h2>
                 <p className="text-system-textSec">
                     {user?.role === UserRole.SUPPLIER_MANAGER 
-                        ? "Review and resolve escalated customer complaints"
-                        : "Overview of all customer complaints"}
+                        ? t('supplier.complaintManagementManager')
+                        : t('supplier.complaintManagementStaff')}
                 </p>
             </div>
 
@@ -1124,25 +1149,25 @@ function ComplaintsManagement() {
                 <div className="bg-white p-8 rounded-3xl shadow-card border border-red-200/50">
                     <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
                         <span className="w-2 h-2 bg-system-red rounded-full animate-pulse"></span>
-                        Escalated Complaints (Requires Manager Action)
+                        {t('supplier.escalatedComplaints')}
                     </h3>
                     <div className="space-y-4">
                         {escalatedComplaints.map(complaint => (
                             <div key={complaint.id} className="p-5 bg-red-50 rounded-2xl border border-red-200">
                                 <div className="flex justify-between items-start mb-3">
                                     <div>
-                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <span className="font-semibold text-system-text">{t('common.complaints')} #{complaint.id}</span>
                                         <p className="text-xs text-system-textSec mt-1">
-                                            Order #{complaint.order_id}
-                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                            {t('supplier.order')} #{complaint.order_id}
+                                            {complaint.created_by && ` • ${t('supplier.fromUser')} #${complaint.created_by}`}
                                             {complaint.handler_name && (
                                                 <span className="block mt-1 text-red-700 font-medium">
-                                                    Handler: {complaint.handler_name} ({complaint.handler_role})
+                                                    {t('supplier.handler')}: {complaint.handler_name} ({complaint.handler_role})
                                                 </span>
                                             )}
                                         </p>
                                         <span className="inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                                            ESCALATED
+                                            {t('supplier.escalated')}
                                         </span>
                                     </div>
                                     {user?.role === UserRole.SUPPLIER_MANAGER && (
@@ -1150,7 +1175,7 @@ function ComplaintsManagement() {
                                             onClick={() => handleResolve(complaint.id)}
                                             className="bg-system-green text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600"
                                         >
-                                            Resolve
+                                            {t('supplier.resolve')}
                                         </button>
                                     )}
                                 </div>
@@ -1163,19 +1188,19 @@ function ComplaintsManagement() {
 
             {/* All Other Complaints */}
             <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
-                <h3 className="text-lg font-semibold text-system-text mb-6">All Complaints</h3>
+                <h3 className="text-lg font-semibold text-system-text mb-6">{t('supplier.allComplaints')}</h3>
                 {allComplaints.length === 0 ? (
-                    <p className="text-system-textSec text-sm">No complaints to display</p>
+                    <p className="text-system-textSec text-sm">{t('supplier.noComplaints')}</p>
                 ) : (
                     <div className="space-y-4">
                         {allComplaints.map(complaint => (
                             <div key={complaint.id} className="p-5 bg-system-bg rounded-2xl border border-system-border/50">
                                 <div className="flex justify-between items-start mb-3">
                                     <div>
-                                        <span className="font-semibold text-system-text">Complaint #{complaint.id}</span>
+                                        <span className="font-semibold text-system-text">{t('common.complaints')} #{complaint.id}</span>
                                         <p className="text-xs text-system-textSec mt-1">
-                                            Order #{complaint.order_id}
-                                            {complaint.created_by && ` • From User #${complaint.created_by}`}
+                                            {t('supplier.order')} #{complaint.order_id}
+                                            {complaint.created_by && ` • ${t('supplier.fromUser')} #${complaint.created_by}`}
                                         </p>
                                         <span className={`inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium ${
                                             complaint.status === ComplaintStatus.OPEN ? 'bg-yellow-100 text-yellow-700' :
@@ -1189,9 +1214,9 @@ function ComplaintsManagement() {
                                 <p className="text-sm text-system-text">{complaint.description}</p>
                                 {complaint.handler_name && (
                                     <p className="text-xs text-system-textSec mt-3">
-                                        Handler: {complaint.handler_name} 
+                                        {t('supplier.handler')}: {complaint.handler_name} 
                                         <span className="ml-1 px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
-                                            {complaint.handler_role === 'SUPPLIER_SALES' ? 'Sales Rep' : 'Manager'}
+                                            {complaint.handler_role === 'SUPPLIER_SALES' ? t('login.supplierSales') : t('login.supplierManager')}
                                         </span>
                                     </p>
                                 )}
@@ -1205,6 +1230,7 @@ function ComplaintsManagement() {
 }
 
 function CompanySettings() {
+    const { t } = useTranslation();
     const { user, setUser } = useApp();
     const navigate = useNavigate();
     const [company, setCompany] = useState<Company | null>(null);
@@ -1293,6 +1319,7 @@ function CompanySettings() {
         try {
             await api.auth.deleteCompany();
             alert('Company deleted successfully. You will be logged out.');
+            api.logout();
             setUser(null);
             navigate('/login');
         } catch (err: any) {
@@ -1300,28 +1327,28 @@ function CompanySettings() {
         }
     };
 
-    if (loading) return <div>Loading settings...</div>;
+    if (loading) return <div>{t('common.loading')}</div>;
 
     return (
         <div className="space-y-8 animate-in fade-in">
             <div>
-                <h2 className="text-2xl font-bold text-system-text tracking-tight">Company Settings</h2>
-                <p className="text-system-textSec">{isOwner ? 'Manage your company information and status' : 'View company information (read-only for managers)'}</p>
+                <h2 className="text-2xl font-bold text-system-text tracking-tight">{t('supplier.companySettings')}</h2>
+                <p className="text-system-textSec">{isOwner ? t('supplier.manageCompanyProfile') : t('supplier.viewCompanyProfile')}</p>
                 {!isOwner && (
                     <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-600">
                         <span className="h-2 w-2 rounded-full bg-amber-500" />
-                        Read-only access
+                        {t('supplier.readOnlyAccess')}
                     </div>
                 )}
             </div>
 
             {/* Company Information */}
             <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
-                <h3 className="text-lg font-semibold text-system-text mb-6">Company Information</h3>
+                <h3 className="text-lg font-semibold text-system-text mb-6">{t('supplier.companyInformation')}</h3>
                 <div className="space-y-6">
                     <div>
                         <label className="block text-sm font-medium text-system-text mb-2">
-                            Company Name
+                            {t('supplier.companyName')}
                         </label>
                         <input
                             type="text"
@@ -1333,27 +1360,27 @@ function CompanySettings() {
                                     ? 'focus:ring-2 focus:ring-system-blue' 
                                     : 'bg-gray-50 cursor-not-allowed opacity-60'
                             }`}
-                            placeholder={loading ? 'Loading...' : 'Company name'}
+                            placeholder={loading ? t('common.loading') : t('supplier.companyName')}
                         />
                     </div>
                     
                     <div>
                         <label className="block text-sm font-medium text-system-text mb-2">
-                            Company Type
+                            {t('supplier.companyType')}
                         </label>
                         <div className="px-4 py-2 bg-system-bg rounded-lg text-system-textSec min-h-[42px] flex items-center">
-                            {loading ? 'Loading...' : (company?.type || 'Not specified')}
+                            {loading ? t('common.loading') : (company?.type || t('common.notSpecified'))}
                         </div>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-system-text mb-2">
-                            KYB Status
+                            {t('supplier.kybStatus')}
                         </label>
                         <div className={`px-4 py-2 rounded-lg inline-block ${
                             company?.kyb_status ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                         }`}>
-                            {company?.kyb_status ? 'Verified' : 'Pending Verification'}
+                            {company?.kyb_status ? t('supplier.verified') : t('supplier.pendingVerification')}
                         </div>
                     </div>
 
@@ -1362,7 +1389,7 @@ function CompanySettings() {
                             onClick={handleSaveSettings}
                             className="bg-system-blue text-white px-6 py-2 rounded-lg hover:bg-blue-600"
                         >
-                            Save Changes
+                            {t('common.saveChanges')}
                         </button>
                     )}
                 </div>
@@ -1370,16 +1397,16 @@ function CompanySettings() {
 
             {/* Company Status */}
             <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
-                <h3 className="text-lg font-semibold text-system-text mb-6">Company Status</h3>
+                <h3 className="text-lg font-semibold text-system-text mb-6">{t('supplier.companyStatus')}</h3>
                 <div className="space-y-6">
                     {isOwner ? (
                         <div className="flex items-center justify-between p-4 bg-system-bg rounded-lg">
                             <div>
-                                <div className="font-medium text-system-text">Company Active</div>
+                                <div className="font-medium text-system-text">{t('supplier.companyActive')}</div>
                                 <div className="text-sm text-system-textSec">
                                     {isActive 
-                                        ? 'Company is active. All team members can log in.' 
-                                        : 'Company is deactivated. No team members can log in.'}
+                                        ? t('supplier.companyActiveDesc') 
+                                        : t('supplier.companyInactiveDesc')}
                                 </div>
                             </div>
                             <button
@@ -1390,52 +1417,39 @@ function CompanySettings() {
                                         : 'bg-green-500 text-white hover:bg-green-600'
                                 }`}
                             >
-                                {isActive ? 'Deactivate' : 'Activate'}
+                                {isActive ? t('supplier.deactivate') : t('supplier.activate')}
                             </button>
                         </div>
                     ) : (
                         <div className="p-4 bg-system-bg rounded-lg">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <div className="font-medium text-system-text">Current Status</div>
-                                    <div className="text-sm text-system-textSec">
-                                        {isActive 
-                                            ? 'Company is currently active and operational.' 
-                                            : 'Company is currently deactivated.'}
-                                    </div>
-                                </div>
-                                <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
-                                    isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                    <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
-                                    {isActive ? 'Active' : 'Inactive'}
-                                </span>
-                            </div>
-                            <div className="mt-3 text-xs text-system-textSec">
-                                Contact company owner to modify settings
+                            <div className="font-medium text-system-text">{t('supplier.companyActive')}</div>
+                            <div className="text-sm text-system-textSec mt-1">
+                                {isActive 
+                                    ? t('supplier.companyActiveDesc') 
+                                    : t('supplier.companyInactiveDesc')}
                             </div>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Danger Zone - Owner Only */}
+            {/* Danger Zone */}
             {isOwner && (
-                <div className="bg-white p-8 rounded-3xl shadow-card border border-red-200">
-                    <h3 className="text-lg font-semibold text-red-600 mb-6">Danger Zone</h3>
-                    <div className="space-y-4">
-                        <div className="p-4 border border-red-200 rounded-lg">
-                            <div className="font-medium text-system-text mb-2">Delete Company</div>
-                            <div className="text-sm text-system-textSec mb-4">
-                                Permanently delete your company and all associated data. This action cannot be undone.
+                <div className="bg-red-50 p-8 rounded-3xl border border-red-200">
+                    <h3 className="text-lg font-semibold text-red-800 mb-6">{t('supplier.dangerZone')}</h3>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="font-medium text-red-800">{t('supplier.deleteCompany')}</div>
+                            <div className="text-sm text-red-600 mt-1">
+                                {t('supplier.deleteCompanyDesc')}
                             </div>
-                            <button
-                                onClick={handleDeleteCompany}
-                                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 font-medium"
-                            >
-                                Delete Company
-                            </button>
                         </div>
+                        <button
+                            onClick={handleDeleteCompany}
+                            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700"
+                        >
+                            {t('supplier.deleteCompany')}
+                        </button>
                     </div>
                 </div>
             )}
@@ -1444,189 +1458,112 @@ function CompanySettings() {
 }
 
 function ConnectionManagement() {
-    const { user } = useApp();
+    const { t } = useTranslation();
     const [connections, setConnections] = useState<Connection[]>([]);
-    const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'connections' | 'blacklist'>('connections');
+    const [error, setError] = useState('');
 
     useEffect(() => {
-        loadData();
+        loadConnections();
     }, []);
 
-    const loadData = async () => {
+    const loadConnections = async () => {
         try {
-            const [connectionsData, blacklistData] = await Promise.all([
-                api.getConnections(),
-                api.getBlacklist()
-            ]);
-            setConnections(connectionsData);
-            setBlacklist(blacklistData);
-        } catch (error) {
-            console.error('Failed to load connection data:', error);
+            const data = await api.getMyLinks();
+            // Map Link[] to Connection[] if necessary, or just use Link[]
+            // Assuming Connection type is compatible or I should use Link type
+            setConnections(data as unknown as Connection[]);
+        } catch (err: any) {
+            setError(err.message || t('common.errorLoadingData'));
         } finally {
             setLoading(false);
         }
     };
 
-    const handleBlockConsumer = async (consumerId: number, consumerName: string) => {
-        const reason = prompt(`Block ${consumerName}?\n\nReason (optional):`);
-        if (reason === null) return; // User cancelled
-
+    const handleStatusUpdate = async (id: number, status: 'active' | 'rejected') => {
         try {
-            await api.blockConsumer(consumerId, reason || undefined);
-            await loadData();
-            alert(`${consumerName} has been blocked successfully`);
-        } catch (error: any) {
-            alert(`Failed to block consumer: ${error.message}`);
+            await api.updateLinkStatus(id, status);
+            loadConnections();
+        } catch (err: any) {
+            alert(err.message || t('common.errorUpdatingStatus'));
         }
     };
 
-    const handleUnblockConsumer = async (consumerId: number, consumerName: string) => {
-        if (!confirm(`Unblock ${consumerName}?`)) return;
+    const pendingConnections = connections.filter(c => c.status === 'pending');
+    const activeConnections = connections.filter(c => c.status === 'active');
 
-        try {
-            await api.unblockConsumer(consumerId);
-            await loadData();
-            alert(`${consumerName} has been unblocked successfully`);
-        } catch (error: any) {
-            alert(`Failed to unblock consumer: ${error.message}`);
-        }
-    };
-
-    const handleRemoveConnection = async (consumerId: number, consumerName: string) => {
-        if (!confirm(`Completely remove connection with ${consumerName}?\n\nThis will delete the connection permanently. They can request to link again unless blocked.`)) return;
-
-        try {
-            await api.removeConnection(consumerId);
-            await loadData();
-            alert(`Connection with ${consumerName} has been removed`);
-        } catch (error: any) {
-            alert(`Failed to remove connection: ${error.message}`);
-        }
-    };
-
-    if (loading) return <div>Loading connections...</div>;
+    if (loading) return <div>{t('common.loading')}</div>;
 
     return (
         <div className="space-y-8 animate-in fade-in">
             <div>
-                <h2 className="text-2xl font-bold text-system-text tracking-tight">Connection Management</h2>
-                <p className="text-system-textSec">Manage your connections and blocked consumers</p>
+                <h2 className="text-2xl font-bold text-system-text tracking-tight">{t('supplier.connectionManagement')}</h2>
+                <p className="text-system-textSec">{t('supplier.connectionManagementSubtitle')}</p>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-4 border-b border-system-border">
-                <button
-                    onClick={() => setActiveTab('connections')}
-                    className={`pb-2 px-4 font-medium border-b-2 transition-colors ${
-                        activeTab === 'connections' 
-                            ? 'border-system-blue text-system-blue' 
-                            : 'border-transparent text-system-textSec hover:text-system-text'
-                    }`}
-                >
-                    Connections ({connections.length})
-                </button>
-                <button
-                    onClick={() => setActiveTab('blacklist')}
-                    className={`pb-2 px-4 font-medium border-b-2 transition-colors ${
-                        activeTab === 'blacklist' 
-                            ? 'border-system-blue text-system-blue' 
-                            : 'border-transparent text-system-textSec hover:text-system-text'
-                    }`}
-                >
-                    Blacklist ({blacklist.length})
-                </button>
-            </div>
-
-            {/* Connections Tab */}
-            {activeTab === 'connections' && (
-                <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
-                    <h3 className="text-lg font-semibold text-system-text mb-6">Active Connections</h3>
-                    {connections.length === 0 ? (
-                        <p className="text-system-textSec">No connections found</p>
-                    ) : (
-                        <div className="space-y-4">
-                            {connections.map(connection => (
-                                <div key={connection.id} className="flex items-center justify-between p-4 border border-system-border rounded-lg">
-                                    <div>
-                                        <div className="font-semibold text-system-text">{connection.consumer_name}</div>
-                                        <div className="text-sm text-system-textSec">
-                                            Status: <span className={`font-medium ${
-                                                connection.status === 'APPROVED' ? 'text-green-600' : 
-                                                connection.status === 'PENDING' ? 'text-yellow-600' :
-                                                'text-red-600'
-                                            }`}>{connection.status}</span>
-                                            {connection.is_blacklisted && (
-                                                <span className="ml-2 px-2 py-1 bg-red-100 text-red-700 text-xs rounded">
-                                                    Blacklisted
-                                                </span>
-                                            )}
-                                        </div>
+            {/* Pending Requests */}
+            {pendingConnections.length > 0 && (
+                <div className="bg-white p-8 rounded-3xl shadow-card border border-blue-200/50">
+                    <h3 className="text-lg font-semibold text-system-text mb-6 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-system-blue rounded-full animate-pulse"></span>
+                        {t('supplier.pendingRequests')}
+                    </h3>
+                    <div className="space-y-4">
+                        {pendingConnections.map(connection => (
+                            <div key={connection.id} className="p-5 bg-blue-50 rounded-2xl border border-blue-200 flex items-center justify-between">
+                                <div>
+                                    <div className="font-semibold text-system-text">
+                                        {connection.consumer_company_name || t('supplier.unknownCompany')}
                                     </div>
-                                    <div className="flex gap-2">
-                                        {!connection.is_blacklisted && (
-                                            <button
-                                                onClick={() => handleBlockConsumer(connection.consumer_id, connection.consumer_name)}
-                                                className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                                            >
-                                                Block
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={() => handleRemoveConnection(connection.consumer_id, connection.consumer_name)}
-                                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
-                                        >
-                                            Remove
-                                        </button>
+                                    <div className="text-sm text-system-textSec mt-1">
+                                        {t('supplier.requestedOn')} {new Date(connection.created_at).toLocaleDateString()}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => handleStatusUpdate(connection.id, 'active')}
+                                        className="bg-system-blue text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600 transition-colors"
+                                    >
+                                        {t('supplier.accept')}
+                                    </button>
+                                    <button
+                                        onClick={() => handleStatusUpdate(connection.id, 'rejected')}
+                                        className="bg-white border border-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm hover:bg-blue-50 transition-colors"
+                                    >
+                                        {t('supplier.reject')}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
-            {/* Blacklist Tab */}
-            {activeTab === 'blacklist' && (
-                <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
-                    <h3 className="text-lg font-semibold text-system-text mb-6">Blacklisted Companies</h3>
-                    {blacklist.length === 0 ? (
-                        <p className="text-system-textSec">No companies in blacklist</p>
-                    ) : (
-                        <div className="space-y-4">
-                            {blacklist.map(entry => (
-                                <div key={entry.id} className="p-4 border border-red-200 bg-red-50 rounded-lg">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                            <div className="font-semibold text-system-text">{entry.consumer_name}</div>
-                                            <div className="text-sm text-system-textSec mt-1">
-                                                Blocked on: {new Date(entry.blocked_at).toLocaleString()}
-                                            </div>
-                                            {entry.blocker_email && (
-                                                <div className="text-sm text-system-textSec">
-                                                    Blocked by: {entry.blocker_email}
-                                                </div>
-                                            )}
-                                            {entry.reason && (
-                                                <div className="text-sm text-system-text mt-2">
-                                                    Reason: {entry.reason}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <button
-                                            onClick={() => handleUnblockConsumer(entry.consumer_id, entry.consumer_name)}
-                                            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-                                        >
-                                            Unblock
-                                        </button>
+            {/* Active Connections */}
+            <div className="bg-white p-8 rounded-3xl shadow-card border border-system-border/50">
+                <h3 className="text-lg font-semibold text-system-text mb-6">{t('supplier.activeConnections')}</h3>
+                {activeConnections.length === 0 ? (
+                    <p className="text-system-textSec text-sm">{t('supplier.noActiveConnections')}</p>
+                ) : (
+                    <div className="space-y-4">
+                        {activeConnections.map(connection => (
+                            <div key={connection.id} className="p-5 bg-system-bg rounded-2xl border border-system-border/50 flex items-center justify-between">
+                                <div>
+                                    <div className="font-semibold text-system-text">
+                                        {connection.consumer_company_name || t('supplier.unknownCompany')}
+                                    </div>
+                                    <div className="text-sm text-system-textSec mt-1">
+                                        {t('supplier.connectedSince')} {new Date(connection.updated_at).toLocaleDateString()}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
+                                <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                    {t('supplier.active')}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
