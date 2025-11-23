@@ -98,9 +98,11 @@ const VoiceMessage = ({ uri, isMe }) => {
   );
 };
 
-export default function ChatScreen() {
+export default function ChatScreen({ route, navigation }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+
+  if (!user) return null;
 
   // State
   const [conversations, setConversations] = useState([]);
@@ -117,7 +119,6 @@ export default function ChatScreen() {
   const wsRef = useRef(null);
   const selectedConversationRef = useRef(null);
 
-  // Keep ref in sync with state for WebSocket callbacks
   useEffect(() => {
     selectedConversationRef.current = selectedConversation;
   }, [selectedConversation]);
@@ -255,6 +256,27 @@ export default function ChatScreen() {
     setSelectedConversation(conv);
     loadMessages(conv.id);
   };
+
+  // Handle route params for "Reply in Chat"
+  useEffect(() => {
+    if (route?.params?.selectedUserId) {
+      const { selectedUserId, complaintText } = route.params;
+      
+      // Pre-fill text if provided
+      if (complaintText) {
+        setInputText(complaintText);
+      }
+
+      // Find conversation with this user
+      const conversation = conversations.find(c => c.id === selectedUserId);
+      if (conversation) {
+        handleSelectConversation(conversation);
+      }
+      
+      // Clear params so they don't re-trigger
+      navigation.setParams({ selectedUserId: null, complaintText: null });
+    }
+  }, [route?.params, conversations]);
 
   // 6. File & Audio Handling
   const handlePickDocument = async () => {

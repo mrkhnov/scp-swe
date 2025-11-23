@@ -81,31 +81,37 @@ export default function ProductCatalogScreen({ navigation }) {
     }
   };
 
-  const renderProduct = ({ item }) => (
-    <View style={styles.productCard}>
-      <View style={styles.productImage}>
-        {item.image_url ? (
-          <Image source={{ uri: item.image_url }} style={styles.image} />
-        ) : (
-          <Text style={styles.placeholder}>📦</Text>
-        )}
+  const renderProduct = ({ item }) => {
+    const imageUrl = item.image_url 
+      ? (item.image_url.startsWith('http') ? item.image_url : `${api.getApiUrl()}${item.image_url}`)
+      : null;
+
+    return (
+      <View style={styles.productCard}>
+        <View style={styles.productImage}>
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.image} />
+          ) : (
+            <Text style={styles.placeholder}>📦</Text>
+          )}
+        </View>
+        <View style={styles.productInfo}>
+          <Text style={styles.productName}>{item.name}</Text>
+          <Text style={styles.productSku}>SKU: {item.sku}</Text>
+          <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+          <Text style={styles.productStock}>
+            Stock: {item.stock_quantity} | Min Order: {item.min_order_qty}
+          </Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => addToCart(item)}
+        >
+          <Text style={styles.addButtonText}>Add</Text>
+        </TouchableOpacity>
       </View>
-      <View style={styles.productInfo}>
-        <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productSku}>SKU: {item.sku}</Text>
-        <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
-        <Text style={styles.productStock}>
-          Stock: {item.stock_quantity} | Min Order: {item.min_order_qty}
-        </Text>
-      </View>
-      <TouchableOpacity 
-        style={styles.addButton}
-        onPress={() => addToCart(item)}
-      >
-        <Text style={styles.addButtonText}>Add</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

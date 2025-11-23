@@ -10,6 +10,10 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +23,9 @@ import { COLORS } from '../constants/colors';
 
 export default function ComplaintsScreen({ navigation }) {
   const { user } = useAuth();
+  
+  if (!user) return null;
+
   const [complaints, setComplaints] = useState([]);
   const [orders, setOrders] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,8 +63,13 @@ export default function ComplaintsScreen({ navigation }) {
   };
 
   const handleCreateComplaint = async () => {
-    if (!selectedOrderId || !description.trim()) {
-      Alert.alert('Error', 'Please select an order and enter description');
+    if (!selectedOrderId) {
+      Alert.alert('Error', 'Please select an order');
+      return;
+    }
+
+    if (!description.trim() || description.trim().length < 10) {
+      Alert.alert('Error', 'Description must be at least 10 characters long');
       return;
     }
 
@@ -133,8 +145,44 @@ export default function ComplaintsScreen({ navigation }) {
     }
   };
 
+  const handleReplyInChat = (complaint) => {
+    navigation.navigate('Chat', {
+      selectedUserId: complaint.created_by,
+      complaintId: complaint.id,
+      complaintText: `Regarding Order #${complaint.order_id} - ${complaint.description}`
+    });
+    setDetailModalVisible(false);
+  };
+
   const getStatusColor = (status) => {
     return COLORS.status[status] || COLORS.text.secondary;
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        // Try parsing manually if standard parsing fails (e.g. for some ISO formats on Android)
+        return dateString.split('T')[0];
+      }
+      return date.toLocaleDateString();
+    } catch (e) {
+      return dateString;
+    }
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString.replace('T', ' ').split('.')[0];
+      }
+      return date.toLocaleString();
+    } catch (e) {
+      return dateString;
+    }
   };
 
   const renderComplaint = ({ item }) => (
@@ -158,7 +206,7 @@ export default function ComplaintsScreen({ navigation }) {
 
       <View style={styles.complaintFooter}>
         <Text style={styles.complaintDate}>
-          {new Date(item.created_at).toLocaleDateString()}
+          {formatDate(item.created_at)}
         </Text>
         {item.handler_name && (
           <Text style={styles.assignedText}>
@@ -178,7 +226,12 @@ export default function ComplaintsScreen({ navigation }) {
     
     const canAssign = isSales && selectedComplaint.status === 'OPEN' && !selectedComplaint.handler_id;
     const canResolve = (isSales || isManager) && selectedComplaint.status !== 'RESOLVED';
-    const canEscalate = (isSales || isConsumer) && selectedComplaint.status !== 'RESOLVED' && selectedComplaint.status !== 'ESCALATED';
+    
+    // Consumer can escalate ONLY if resolved (not satisfied)
+    // Sales can escalate if NOT resolved (needs manager)
+    const canEscalate = isConsumer 
+      ? selectedComplaint.status === 'RESOLVED'
+      : (isSales && selectedComplaint.status !== 'RESOLVED' && selectedComplaint.status !== 'ESCALATED');
 
     return (
       <Modal
@@ -224,7 +277,7 @@ export default function ComplaintsScreen({ navigation }) {
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>Created</Text>
                 <Text style={styles.detailValue}>
-                  {new Date(selectedComplaint.created_at).toLocaleString()}
+                  {formatDateTime(selectedComplaint.created_at)}
                 </Text>
               </View>
 
@@ -232,12 +285,21 @@ export default function ComplaintsScreen({ navigation }) {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>Resolved</Text>
                   <Text style={styles.detailValue}>
-                    {new Date(selectedComplaint.resolved_at).toLocaleString()}
+                    {formatDateTime(selectedComplaint.resolved_at)}
                   </Text>
                 </View>
               )}
 
               <View style={styles.actionButtonsDetail}>
+                {isSales && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.replyButton]}
+                    onPress={() => handleReplyInChat(selectedComplaint)}
+                  >
+                    <Text style={styles.actionButtonText}>Reply in Chat</Text>
+                  </TouchableOpacity>
+                )}
+
                 {canAssign && (
                   <TouchableOpacity
                     style={[styles.actionButton, styles.assignButton]}
@@ -315,52 +377,59 @@ export default function ComplaintsScreen({ navigation }) {
         transparent={true}
         onRequestClose={() => setShowCreateModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>File a Complaint</Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={styles.keyboardAvoidingView}
+            >
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>File a Complaint</Text>
 
-            <Text style={styles.label}>Select Order</Text>
-            <View style={styles.ordersList}>
-              {orders.map(order => (
-                <TouchableOpacity
-                  key={order.id}
-                  style={[
-                    styles.orderOption,
-                    selectedOrderId === order.id && styles.orderOptionSelected
-                  ]}
-                  onPress={() => setSelectedOrderId(order.id)}
-                >
-                  <Text>Order #{order.id} - ${order.total_amount.toFixed(2)}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                <Text style={styles.label}>Select Order</Text>
+                <View style={styles.ordersList}>
+                  {orders.map(order => (
+                    <TouchableOpacity
+                      key={order.id}
+                      style={[
+                        styles.orderOption,
+                        selectedOrderId === order.id && styles.orderOptionSelected
+                      ]}
+                      onPress={() => setSelectedOrderId(order.id)}
+                    >
+                      <Text>Order #{order.id} - ${order.total_amount.toFixed(2)}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Describe the issue..."
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={4}
-            />
+                <Text style={styles.label}>Description</Text>
+                <TextInput
+                  style={styles.textArea}
+                  placeholder="Describe the issue..."
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                  numberOfLines={4}
+                />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowCreateModal(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.submitButton]}
-                onPress={handleCreateComplaint}
-              >
-                <Text style={styles.modalButtonText}>Submit</Text>
-              </TouchableOpacity>
-            </View>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => setShowCreateModal(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.submitButton]}
+                    onPress={handleCreateComplaint}
+                  >
+                    <Text style={styles.modalButtonText}>Submit</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {renderDetailModal()}
@@ -472,8 +541,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
+  replyButton: {
+    backgroundColor: COLORS.primary,
+  },
   assignButton: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.success,
   },
   resolveButton: {
     backgroundColor: COLORS.success,
@@ -595,5 +667,8 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: 16,
     color: COLORS.text.primary,
+  },
+  keyboardAvoidingView: {
+    width: '100%',
   },
 });

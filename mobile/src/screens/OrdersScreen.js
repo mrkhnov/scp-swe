@@ -16,6 +16,9 @@ import { COLORS } from '../constants/colors';
 
 export default function OrdersScreen({ navigation }) {
   const { user } = useAuth();
+  
+  if (!user) return null;
+
   const [orders, setOrders] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);

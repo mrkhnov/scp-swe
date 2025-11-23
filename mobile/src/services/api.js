@@ -7,7 +7,7 @@ const getApiUrl = () => {
     return 'http://localhost:8000';
   }
   // Replace this IP with your computer's local IP address
-  return 'http://172.20.10.2:8000';
+  return 'http://192.168.0.159:8000';
 };
 
 const API_URL = getApiUrl();
@@ -106,7 +106,13 @@ class ApiService {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-        throw new Error(error.detail || `HTTP ${response.status}`);
+        let errorMessage = error.detail || `HTTP ${response.status}`;
+        
+        if (typeof errorMessage === 'object') {
+          errorMessage = JSON.stringify(errorMessage);
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const contentType = response.headers.get('content-type');
